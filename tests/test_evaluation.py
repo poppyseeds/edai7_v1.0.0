@@ -22,7 +22,13 @@ def test_diversity_unique_rows() -> None:
 
 
 def test_benchmark_metrics_classification() -> None:
-    X, y = make_classification(n_samples=80, n_features=4, n_informative=3, random_state=0)
+    X, y = make_classification(
+        n_samples=80,
+        n_features=4,
+        n_informative=3,
+        n_redundant=0,
+        random_state=0,
+    )
     df = pd.DataFrame(X, columns=["f1", "f2", "f3", "f4"])
     y = pd.Series(y.astype(str), name="target")
     model = DownstreamModel("classification", random_state=0)

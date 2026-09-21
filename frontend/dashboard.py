@@ -31,9 +31,9 @@ SAMPLE_PATH = ROOT / "datasets" / "sample" / "customer_churn.csv"
 
 def issue_card(label: str, present: bool, ok_text: str) -> None:
     if present:
-        st.error(f"⚠ {label}")
+        st.error(f"Warning: {label}")
     else:
-        st.success(f"✓ {ok_text}")
+        st.success(f"OK: {ok_text}")
 
 
 with st.sidebar:
@@ -93,8 +93,8 @@ c1.metric("Rows", analysis.rows)
 c2.metric("Columns", analysis.columns)
 c3.metric("Missing %", f"{analysis.missing_percentage:.2f}")
 c4.metric("Duplicate %", f"{analysis.duplicate_percentage:.2f}")
-st.write("Numerical columns:", ", ".join(analysis.numerical_columns) or "—")
-st.write("Categorical columns:", ", ".join(analysis.categorical_columns) or "—")
+st.write("Numerical columns:", ", ".join(analysis.numerical_columns) or "-")
+st.write("Categorical columns:", ", ".join(analysis.categorical_columns) or "-")
 st.write("Detected target:", analysis.target_column, f"({analysis.task_type})")
 if analysis.class_distribution:
     dist_df = pd.DataFrame(
@@ -105,7 +105,7 @@ if analysis.class_distribution:
     )
     st.plotly_chart(
         px.bar(dist_df, x="class", y="share", title="Target class distribution"),
-        use_container_width=True,
+        width="stretch",
     )
 
 st.subheader("3. Detected problems")
@@ -157,9 +157,9 @@ synthetic = output.synthetic_df
 
 st.subheader("4. Agent activity")
 for log in result.agent_logs:
-    st.markdown(f"**{log.agent}** — {log.message}")
-    st.markdown("↓")
-st.markdown("**Pipeline** — finished")
+    st.markdown(f"**{log.agent}** - {log.message}")
+    st.markdown("then")
+st.markdown("**Pipeline** - finished")
 
 if result.llm_summaries:
     with st.expander("Gemini / fallback explanations"):
@@ -204,7 +204,7 @@ if result.iterations:
             fig.add_trace(go.Histogram(x=df[col], name="original", opacity=0.6))
             fig.add_trace(go.Histogram(x=synthetic[col], name="synthetic", opacity=0.6))
             fig.update_layout(barmode="overlay", title=f"{col}: original vs synthetic")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         if analysis.target_column and analysis.target_column in synthetic.columns:
             cmp = pd.concat(
                 [
@@ -216,20 +216,26 @@ if result.iterations:
                 ],
                 axis=1,
             ).fillna(0)
+            cmp_df = cmp.rename_axis("class").reset_index()
             st.plotly_chart(
-                px.bar(cmp.reset_index(), x="index", y=["original", "synthetic"], barmode="group",
-                       title="Class distribution"),
-                use_container_width=True,
+                px.bar(
+                    cmp_df,
+                    x="class",
+                    y=["original", "synthetic"],
+                    barmode="group",
+                    title="Class distribution",
+                ),
+                width="stretch",
             )
         num_cols = [c for c in analysis.numerical_columns if c in df.columns]
         if len(num_cols) >= 2:
             st.plotly_chart(
                 px.imshow(df[num_cols].corr(numeric_only=True), title="Original correlations"),
-                use_container_width=True,
+                width="stretch",
             )
             st.plotly_chart(
                 px.imshow(synthetic[num_cols].corr(numeric_only=True), title="Synthetic correlations"),
-                use_container_width=True,
+                width="stretch",
             )
 
 st.subheader("7. Benchmark")
@@ -265,8 +271,8 @@ for rec in result.iterations:
     primary = bench.augmented.primary_value if bench else None
     status = "SUCCESS" if bench and bench.improved else "FAILED"
     st.markdown(
-        f"**Iteration {rec.iteration}** — `{rec.plan.generator}` — "
-        f"primary={primary if primary is None else round(primary, 4)} — **{status}**"
+        f"**Iteration {rec.iteration}** - `{rec.plan.generator}` - "
+        f"primary={primary if primary is None else round(primary, 4)} - **{status}**"
     )
     st.caption(rec.plan.reason)
 

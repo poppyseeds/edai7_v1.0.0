@@ -121,7 +121,7 @@ class FairnessResult(BaseModel):
     sensitive_column: str
     group_metrics: dict[str, dict[str, float | None]]
     max_gap: float | None = None
-    notes: str = "Simple group comparison only — not a complete fairness audit."
+    notes: str = "Simple group comparison only - not a complete fairness audit."
 
 
 class PipelineResult(BaseModel):
