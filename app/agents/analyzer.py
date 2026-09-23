@@ -30,6 +30,7 @@ class DatasetAnalyzer:
         self,
         df: pd.DataFrame,
         target_column: str | None = None,
+        auto_detect_target: bool = False,
     ) -> DatasetAnalysis:
         logger.info("Starting dataset analysis")
         if df.empty:
@@ -44,7 +45,9 @@ class DatasetAnalyzer:
         duplicate_rows = int(df.duplicated().sum())
         duplicate_percentage = float(duplicate_rows / n_rows * 100)
 
-        target = self._resolve_target(df, target_column)
+        target, target_detected, target_reason = self._resolve_target(
+            df, target_column, auto_detect_target=auto_detect_target
+        )
         task_type = None
         class_distribution: dict[str, float] | None = None
         if target is not None:
@@ -91,6 +94,8 @@ class DatasetAnalyzer:
             duplicate_percentage=round(duplicate_percentage, 4),
             duplicate_rows=duplicate_rows,
             target_column=target,
+            target_detected=target_detected,
+            target_detection_reason=target_reason,
             task_type=task_type,
             class_distribution=class_distribution,
             unique_value_stats=unique_value_stats,
@@ -102,17 +107,30 @@ class DatasetAnalyzer:
             issue_details=details,
         )
 
-    def _resolve_target(self, df: pd.DataFrame, target_column: str | None) -> str | None:
+    def _resolve_target(
+        self,
+        df: pd.DataFrame,
+        target_column: str | None,
+        auto_detect_target: bool,
+    ) -> tuple[str | None, bool, str | None]:
         if target_column:
             if target_column not in df.columns:
                 raise ValueError(f"Target column '{target_column}' is not in the dataset.")
-            return target_column
+            return target_column, True, "Target column was explicitly selected by the user."
+        if not auto_detect_target:
+            logger.info("No target column selected")
+            return None, False, None
         lowered = {c.lower(): c for c in df.columns}
         for candidate in TARGET_NAME_CANDIDATES:
             if candidate in lowered:
                 logger.info("Auto-detected target column '%s'", lowered[candidate])
-                return lowered[candidate]
-        return df.columns[-1]
+                return (
+                    lowered[candidate],
+                    True,
+                    f"Auto-detected by common target-like column name '{candidate}'.",
+                )
+        logger.info("No target column auto-detected")
+        return None, False, "No conservative target-column match was found."
 
     def _infer_task_type(self, series: pd.Series) -> str:
         nunique = series.nunique(dropna=True)
@@ -187,7 +205,7 @@ class DatasetAnalyzer:
                 details["severe_class_imbalance"] = (
                     f"Minority class share is {minority:.1%}; majority is {majority:.1%}."
                 )
-            elif minority < 0.30:
+            elif minority <= 0.30:
                 issues.append("class_imbalance")
                 details["class_imbalance"] = f"Minority class share is {minority:.1%}."
 

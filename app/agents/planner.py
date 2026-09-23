@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.config import get_settings
+from app.agents.sample_planner import SamplePlanner
 from app.schemas.schemas import DatasetAnalysis, GenerationPlan
 from app.utils.logging_config import get_logger
 
@@ -20,29 +21,20 @@ class GenerationPlanner:
         tvae_epochs: int | None = None,
     ) -> GenerationPlan:
         settings = get_settings()
-        ratio = synthetic_ratio if synthetic_ratio is not None else settings.default_synthetic_ratio
         seed = random_state if random_state is not None else settings.random_state
         ctgan_epochs = ctgan_epochs if ctgan_epochs is not None else settings.ctgan_epochs
         tvae_epochs = tvae_epochs if tvae_epochs is not None else settings.tvae_epochs
 
         issues = set(analysis.issues)
-        num_samples = max(int(analysis.rows * ratio), 20)
-        strategy = "full_distribution"
+        sample_decision = SamplePlanner().plan(analysis)
+        num_samples = sample_decision.samples_to_generate
+        strategy = sample_decision.generation_mode
         generator = "gaussian_copula"
         reason_parts: list[str] = []
 
         if analysis.class_distribution:
-            counts = analysis.class_distribution
-            majority = max(counts.values())
-            minority = min(counts.values())
             if "severe_class_imbalance" in issues or "class_imbalance" in issues:
-                strategy = "minority_oversampling"
-                majority_n = int(majority * analysis.rows)
-                minority_n = int(minority * analysis.rows)
-                num_samples = max(num_samples, majority_n - minority_n, 20)
-                reason_parts.append("Class imbalance detected; oversampling the minority class.")
-
-        num_samples = min(num_samples, max(analysis.rows * 2, 40))
+                reason_parts.append("Class imbalance detected; planning targeted minority augmentation.")
 
         if preferred_generator:
             generator = preferred_generator
@@ -71,6 +63,7 @@ class GenerationPlanner:
 
         if not reason_parts:
             reason_parts.append("Default generation strategy.")
+        reason_parts.append(sample_decision.reason)
 
         reason = " ".join(reason_parts)
         logger.info("Selected %s (%s samples)", generator, num_samples)
@@ -78,8 +71,19 @@ class GenerationPlanner:
             generator=generator,  # type: ignore[arg-type]
             num_samples=int(num_samples),
             reason=reason,
+            generation_needed=sample_decision.generation_needed,
+            generation_mode=sample_decision.generation_mode,
             target_column=analysis.target_column,
+            target_class=sample_decision.target_class,
             target_strategy=strategy,
+            original_rows=sample_decision.original_rows,
+            current_target_count=sample_decision.current_target_count,
+            desired_target_count=sample_decision.desired_target_count,
+            samples_to_generate=sample_decision.samples_to_generate,
+            augmentation_ratio=sample_decision.augmentation_ratio,
+            max_allowed_samples=sample_decision.max_allowed_samples,
+            sample_count_reason=sample_decision.reason,
+            sample_count_details=sample_decision.details,
             epochs=epochs,
             random_state=seed,
             preserve_columns=list(analysis.column_names),

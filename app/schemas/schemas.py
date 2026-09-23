@@ -19,6 +19,8 @@ class DatasetAnalysis(BaseModel):
     duplicate_percentage: float
     duplicate_rows: int
     target_column: str | None = None
+    target_detected: bool = False
+    target_detection_reason: str | None = None
     task_type: Literal["classification", "regression"] | None = None
     class_distribution: dict[str, float] | None = None
     unique_value_stats: dict[str, int]
@@ -34,8 +36,19 @@ class GenerationPlan(BaseModel):
     generator: Literal["ctgan", "tvae", "gaussian_copula"]
     num_samples: int
     reason: str
+    generation_needed: bool = True
+    generation_mode: str = "dataset_expansion"
     target_column: str | None = None
+    target_class: str | int | float | None = None
     target_strategy: str = "full_distribution"
+    original_rows: int | None = None
+    current_target_count: int | None = None
+    desired_target_count: int | None = None
+    samples_to_generate: int | None = None
+    augmentation_ratio: float | None = None
+    max_allowed_samples: int | None = None
+    sample_count_reason: str | None = None
+    sample_count_details: dict[str, Any] = Field(default_factory=dict)
     epochs: int | None = None
     random_state: int = 42
     preserve_columns: list[str] = Field(default_factory=list)
@@ -48,6 +61,18 @@ class ValidationResult(BaseModel):
     correlation_score: float
     diversity_score: float
     privacy_score: float
+    overall_score: float
+    passed: bool
+    details: dict[str, Any] = Field(default_factory=dict)
+    metric_notes: dict[str, str] = Field(default_factory=dict)
+
+
+class UnsupervisedUtilityResult(BaseModel):
+    label: str = "Unsupervised / Statistical Utility"
+    distribution_score: float
+    correlation_score: float
+    diversity_score: float
+    structural_score: float
     overall_score: float
     passed: bool
     details: dict[str, Any] = Field(default_factory=dict)
@@ -103,6 +128,11 @@ class IterationRecord(BaseModel):
     plan: GenerationPlan
     validation: ValidationResult
     benchmark: BenchmarkResult | None = None
+    unsupervised_utility: UnsupervisedUtilityResult | None = None
+    samples_requested: int
+    samples_generated: int
+    cumulative_synthetic_rows: int
+    decision: str = "retry"
     synthetic_rows: int
     synthetic_path: str | None = None
 
@@ -127,6 +157,8 @@ class FairnessResult(BaseModel):
 class PipelineResult(BaseModel):
     run_id: str
     timestamp: str
+    evaluation_mode: Literal["labeled", "unlabeled"]
+    target_column: str | None = None
     dataset_filename: str | None = None
     dataset_analysis: DatasetAnalysis
     baseline: ModelMetrics | None = None
@@ -136,6 +168,7 @@ class PipelineResult(BaseModel):
     llm_summaries: dict[str, str] = Field(default_factory=dict)
     fairness: FairnessResult | None = None
     provenance: ProvenanceFingerprint | None = None
+    final_evaluation: dict[str, Any] = Field(default_factory=dict)
     final_decision: str
     improved: bool
     final_dataset_path: str | None = None
@@ -151,6 +184,7 @@ class PipelineConfigModel(BaseModel):
     min_improvement: float = 0.005
     test_size: float = 0.25
     enable_llm: bool = True
+    auto_detect_target: bool = False
     preferred_generator: str | None = None
     sensitive_column: str | None = None
 

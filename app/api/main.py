@@ -35,6 +35,14 @@ app.add_middleware(
 RUNS: dict[str, dict] = {}
 
 
+def _target_options(target_column: str | None) -> tuple[str | None, bool]:
+    if target_column in {None, "", "None"}:
+        return None, False
+    if target_column in {"__auto__", "Auto Detect", "auto"}:
+        return None, True
+    return target_column, False
+
+
 def _read_upload(file: UploadFile, min_rows: int | None = None):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a .csv file.")
@@ -73,10 +81,16 @@ def health() -> dict:
 async def analyze(
     file: UploadFile = File(...),
     target_column: str | None = Form(None),
+    auto_detect_target: bool = Form(False),
 ):
     df, _ = _read_upload(file)
+    explicit_target, auto = _target_options(target_column)
     try:
-        result = DatasetAnalyzer().analyze(df, target_column=target_column)
+        result = DatasetAnalyzer().analyze(
+            df,
+            target_column=explicit_target,
+            auto_detect_target=auto or auto_detect_target,
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return result.model_dump()
@@ -88,10 +102,16 @@ async def generate(
     target_column: str | None = Form(None),
     generator: str | None = Form(None),
     num_samples: int | None = Form(None),
+    auto_detect_target: bool = Form(False),
 ):
     df, filename = _read_upload(file)
     analyzer = DatasetAnalyzer()
-    analysis = analyzer.analyze(df, target_column=target_column)
+    explicit_target, auto = _target_options(target_column)
+    analysis = analyzer.analyze(
+        df,
+        target_column=explicit_target,
+        auto_detect_target=auto or auto_detect_target,
+    )
     plan = GenerationPlanner().plan(analysis, preferred_generator=generator)
     if num_samples:
         plan.num_samples = num_samples
@@ -117,21 +137,24 @@ async def run(
     sensitive_column: str | None = Form(None),
     preferred_generator: str | None = Form(None),
     enable_llm: bool = Form(True),
+    auto_detect_target: bool = Form(False),
 ):
     df, filename = _read_upload(file)
+    explicit_target, auto = _target_options(target_column)
     try:
         output = run_pipeline(
             df,
-            target_column=target_column,
+            target_column=explicit_target,
             config=PipelineConfig(
                 max_iterations=max_iterations,
                 enable_llm=enable_llm,
+                auto_detect_target=auto or auto_detect_target,
                 preferred_generator=preferred_generator,
                 sensitive_column=sensitive_column or None,
                 dataset_filename=filename,
             ),
         )
-    except SyntheticAIError as exc:
+    except (SyntheticAIError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

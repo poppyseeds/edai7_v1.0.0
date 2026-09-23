@@ -16,7 +16,11 @@ import streamlit as st
 
 from app.agents.analyzer import DatasetAnalyzer
 from app.pipeline.orchestrator import PipelineConfig, run_pipeline
-from app.utils.data_utils import create_sample_churn_dataset, validate_dataframe
+from app.utils.data_utils import (
+    create_sample_churn_dataset,
+    create_unlabeled_customer_dataset,
+    validate_dataframe,
+)
 from app.utils.logging_config import setup_logging
 
 setup_logging()
@@ -26,7 +30,8 @@ st.caption(
     "Tabular CSV prototype: analyze, generate, validate, benchmark, and retry."
 )
 
-SAMPLE_PATH = ROOT / "datasets" / "sample" / "customer_churn.csv"
+SAMPLE_PATH = ROOT / "datasets" / "sample" / "labeled_customer.csv"
+UNLABELED_SAMPLE_PATH = ROOT / "datasets" / "sample" / "unlabeled_customer.csv"
 
 
 def issue_card(label: str, present: bool, ok_text: str) -> None:
@@ -38,7 +43,6 @@ def issue_card(label: str, present: bool, ok_text: str) -> None:
 
 with st.sidebar:
     st.header("Run settings")
-    target_column = st.text_input("Target column (optional)", value="target")
     sensitive_column = st.text_input("Sensitive/group column (optional)", value="")
     max_iterations = st.slider("Max optimization iterations", 1, 3, 3)
     preferred = st.selectbox(
@@ -52,7 +56,9 @@ with st.sidebar:
     )
 
 uploaded = st.file_uploader("1. Dataset upload", type=["csv"])
-use_sample = st.button("Load sample customer-churn dataset")
+sample_col_a, sample_col_b = st.columns(2)
+use_sample = sample_col_a.button("Load labeled sample")
+use_unlabeled_sample = sample_col_b.button("Load unlabeled sample")
 
 if "df" not in st.session_state:
     st.session_state.df = None
@@ -63,6 +69,12 @@ if use_sample:
         create_sample_churn_dataset(SAMPLE_PATH, n_rows=500, seed=42)
     st.session_state.df = pd.read_csv(SAMPLE_PATH)
     st.session_state.filename = SAMPLE_PATH.name
+
+if use_unlabeled_sample:
+    if not UNLABELED_SAMPLE_PATH.exists():
+        create_unlabeled_customer_dataset(UNLABELED_SAMPLE_PATH, n_rows=500, seed=42)
+    st.session_state.df = pd.read_csv(UNLABELED_SAMPLE_PATH)
+    st.session_state.filename = UNLABELED_SAMPLE_PATH.name
 
 if uploaded is not None:
     st.session_state.df = pd.read_csv(uploaded)
@@ -79,11 +91,34 @@ except Exception as exc:
     st.error(str(exc))
     st.stop()
 
+st.subheader("Dataset preview")
+st.dataframe(df.head(10))
+
+target_options = ["None", "Auto Detect", *list(df.columns)]
+default_target_index = target_options.index("target") if "target" in df.columns else 0
+target_selection = st.selectbox(
+    "Target Column (Optional)",
+    target_options,
+    index=default_target_index,
+)
+if target_selection == "None":
+    target = None
+    auto_detect_target = False
+elif target_selection == "Auto Detect":
+    target = None
+    auto_detect_target = True
+else:
+    target = target_selection
+    auto_detect_target = False
+
 st.subheader("2. Dataset overview")
 analyzer = DatasetAnalyzer()
-target = target_column.strip() or None
 try:
-    analysis = analyzer.analyze(df, target_column=target)
+    analysis = analyzer.analyze(
+        df,
+        target_column=target,
+        auto_detect_target=auto_detect_target,
+    )
 except Exception as exc:
     st.error(str(exc))
     st.stop()
@@ -95,7 +130,11 @@ c3.metric("Missing %", f"{analysis.missing_percentage:.2f}")
 c4.metric("Duplicate %", f"{analysis.duplicate_percentage:.2f}")
 st.write("Numerical columns:", ", ".join(analysis.numerical_columns) or "-")
 st.write("Categorical columns:", ", ".join(analysis.categorical_columns) or "-")
-st.write("Detected target:", analysis.target_column, f"({analysis.task_type})")
+mode_label = "SUPERVISED / LABELED" if analysis.target_column else "UNSUPERVISED / UNLABELED"
+st.write("Evaluation Mode:", mode_label)
+st.write("Target:", analysis.target_column or "None")
+if analysis.target_detection_reason:
+    st.caption(analysis.target_detection_reason)
 if analysis.class_distribution:
     dist_df = pd.DataFrame(
         {
@@ -140,6 +179,7 @@ if run_clicked:
             config=PipelineConfig(
                 max_iterations=max_iterations,
                 enable_llm=enable_llm,
+                auto_detect_target=auto_detect_target,
                 preferred_generator=None if preferred == "auto" else preferred,
                 sensitive_column=sensitive_column.strip() or None,
                 dataset_filename=st.session_state.filename,
@@ -167,7 +207,27 @@ if result.llm_summaries:
             st.markdown(f"**{key}**")
             st.write(text)
 
-st.subheader("5. Synthetic data")
+st.subheader("5. Planner decision")
+if result.iterations:
+    first_plan = result.iterations[0].plan
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Original rows", first_plan.original_rows or result.dataset_analysis.rows)
+    p2.metric("Generator", first_plan.generator)
+    p3.metric("Generation mode", first_plan.generation_mode)
+    p4.metric("Synthetic rows planned", first_plan.num_samples)
+    if first_plan.target_column:
+        t1, t2, t3 = st.columns(3)
+        t1.metric("Target", first_plan.target_column)
+        t2.metric("Current minority", first_plan.current_target_count or 0)
+        t3.metric("Desired minority", first_plan.desired_target_count or 0)
+        st.write("Target class:", first_plan.target_class)
+    st.caption(first_plan.sample_count_reason or first_plan.reason)
+    with st.expander("Sample-count details"):
+        st.json(first_plan.sample_count_details)
+else:
+    st.info(result.final_evaluation.get("reason", "Synthetic generation was not required."))
+
+st.subheader("6. Synthetic data")
 if synthetic is None:
     st.warning("No synthetic dataset was produced.")
 else:
@@ -180,7 +240,7 @@ else:
         mime="text/csv",
     )
 
-st.subheader("6. Validation")
+st.subheader("7. Validation")
 if result.iterations:
     best = next(
         (it for it in result.iterations if it.iteration == result.best_iteration),
@@ -238,7 +298,7 @@ if result.iterations:
                 width="stretch",
             )
 
-st.subheader("7. Benchmark")
+st.subheader("8. Benchmark")
 if result.baseline:
     last_bench = None
     if result.best_iteration:
@@ -263,21 +323,91 @@ if result.baseline:
     else:
         st.json(result.baseline.model_dump())
 else:
-    st.write("No downstream benchmark (missing or unsupported target).")
+    st.write("N/A - No target column selected.")
+    best_utility = None
+    if result.best_iteration:
+        rec = next(it for it in result.iterations if it.iteration == result.best_iteration)
+        best_utility = rec.unsupervised_utility
+    if best_utility:
+        st.subheader("Unsupervised / Statistical Utility")
+        u1, u2, u3, u4, u5 = st.columns(5)
+        u1.metric("Overall", f"{best_utility.overall_score:.3f}")
+        u2.metric("Distribution", f"{best_utility.distribution_score:.3f}")
+        u3.metric("Correlation", f"{best_utility.correlation_score:.3f}")
+        u4.metric("Diversity", f"{best_utility.diversity_score:.3f}")
+        u5.metric("Structure", f"{best_utility.structural_score:.3f}")
+        with st.expander("Unsupervised utility notes"):
+            st.json(best_utility.metric_notes)
 
-st.subheader("8. Optimization history")
+st.subheader("9. Optimization history")
 for rec in result.iterations:
     bench = rec.benchmark
-    primary = bench.augmented.primary_value if bench else None
-    status = "SUCCESS" if bench and bench.improved else "FAILED"
+    utility = rec.unsupervised_utility
+    if bench:
+        primary = bench.augmented.primary_value
+        status = "ACCEPTED" if bench.improved else "NO ML IMPROVEMENT"
+    elif utility:
+        primary = utility.overall_score
+        status = "ACCEPTED" if utility.passed and rec.validation.passed else "QUALITY BELOW THRESHOLD"
+    else:
+        primary = None
+        status = "STOPPED"
     st.markdown(
         f"**Iteration {rec.iteration}** - `{rec.plan.generator}` - "
+        f"requested={rec.samples_requested} - generated={rec.samples_generated} - "
+        f"cumulative={rec.cumulative_synthetic_rows} - "
         f"primary={primary if primary is None else round(primary, 4)} - **{status}**"
     )
-    st.caption(rec.plan.reason)
+    st.caption(f"{rec.decision}: {rec.plan.reason}")
 
 st.subheader("Final decision")
-st.write(result.final_decision)
+if result.final_decision == "completed_improved":
+    st.success("Optimization completed. A synthetic-data attempt improved the selected utility objective and was accepted.")
+elif result.final_decision == "completed_no_improvement" and result.evaluation_mode == "labeled":
+    st.warning(
+        "Optimization completed. Synthetic data was generated and validated, but downstream ML utility "
+        "did not improve within the configured iteration limit."
+    )
+elif result.final_decision == "completed_no_improvement":
+    st.warning(
+        "Optimization completed. Synthetic data was generated, but the quality/utility threshold was not "
+        "improved within the configured iteration limit."
+    )
+elif result.final_decision == "skipped_generation_not_needed":
+    st.info("Generation was skipped because the planner did not find a strong reason for augmentation.")
+else:
+    st.error(result.final_decision)
+
+if result.iterations:
+    best_rec = next(
+        (it for it in result.iterations if it.iteration == result.best_iteration),
+        result.iterations[-1],
+    )
+    st.subheader("Best attempt")
+    if best_rec.benchmark:
+        b = best_rec.benchmark.baseline
+        a = best_rec.benchmark.augmented
+        delta = best_rec.benchmark.improvement.get("primary_value")
+        ba, bb, bc, bd = st.columns(4)
+        ba.metric("Generator", best_rec.plan.generator)
+        bb.metric(f"Baseline {b.primary_metric}", f"{b.primary_value:.4f}")
+        bc.metric(f"Best {a.primary_metric}", f"{a.primary_value:.4f}")
+        bd.metric("Change", "N/A" if delta is None else f"{delta:+.4f}")
+        if delta is not None and abs(delta) < 1e-9:
+            st.caption("Best attempt matched the baseline: no degradation, but no measurable ML gain.")
+        elif delta is not None and delta < 0:
+            st.caption("Best attempt underperformed the baseline, so it was not accepted as an ML improvement.")
+        elif delta is not None:
+            st.caption("Best attempt improved the supervised benchmark.")
+    elif best_rec.unsupervised_utility:
+        u = best_rec.unsupervised_utility
+        ba, bb, bc, bd = st.columns(4)
+        ba.metric("Generator", best_rec.plan.generator)
+        bb.metric("Utility", f"{u.overall_score:.4f}")
+        bc.metric("Validation", f"{best_rec.validation.overall_score:.4f}")
+        bd.metric("Generated rows", best_rec.samples_generated)
+        st.caption("Best attempt is selected by the highest statistical/unsupervised utility score.")
+
 if result.provenance:
     with st.expander("Prototype provenance fingerprint"):
         st.json(result.provenance.model_dump())

@@ -40,6 +40,33 @@ def test_detects_imbalance(messy_df: pd.DataFrame) -> None:
     assert "severe_class_imbalance" in analysis.issues or "class_imbalance" in analysis.issues
 
 
+def test_no_target_by_default_does_not_use_last_column() -> None:
+    df = pd.DataFrame(
+        {
+            "age": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+            "income": [30000 + i * 1000 for i in range(12)],
+            "spending": [5000 + i * 100 for i in range(12)],
+        }
+    )
+    analysis = DatasetAnalyzer().analyze(df)
+    assert analysis.target_column is None
+    assert analysis.target_detected is False
+    assert analysis.task_type is None
+
+
+def test_auto_detects_named_target(messy_df: pd.DataFrame) -> None:
+    df = messy_df.rename(columns={"target": "churn"})
+    analysis = DatasetAnalyzer().analyze(df, auto_detect_target=True)
+    assert analysis.target_column == "churn"
+    assert analysis.target_detected is True
+    assert analysis.target_detection_reason is not None
+
+
+def test_invalid_explicit_target_raises(messy_df: pd.DataFrame) -> None:
+    with pytest.raises(ValueError, match="not in the dataset"):
+        DatasetAnalyzer().analyze(messy_df, target_column="does_not_exist")
+
+
 def test_sample_dataset_is_imbalanced(tmp_path) -> None:
     path = tmp_path / "churn.csv"
     create_sample_churn_dataset(path, n_rows=200, seed=0)

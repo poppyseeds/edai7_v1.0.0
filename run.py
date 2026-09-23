@@ -6,7 +6,7 @@ import argparse
 
 import uvicorn
 
-from app.utils.data_utils import create_sample_churn_dataset
+from app.utils.data_utils import create_sample_churn_dataset, create_unlabeled_customer_dataset
 from app.utils.logging_config import setup_logging
 
 
@@ -23,8 +23,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     if args.prepare_sample:
-        path = create_sample_churn_dataset("datasets/sample/customer_churn.csv")
-        print(f"Wrote {path}")
+        labeled = create_sample_churn_dataset("datasets/sample/labeled_customer.csv")
+        legacy = create_sample_churn_dataset("datasets/sample/customer_churn.csv")
+        unlabeled = create_unlabeled_customer_dataset("datasets/sample/unlabeled_customer.csv")
+        print(f"Wrote {labeled}")
+        print(f"Wrote {legacy}")
+        print(f"Wrote {unlabeled}")
         return
     print("API:     uvicorn app.api.main:app --reload")
     print("UI:      streamlit run frontend/dashboard.py")

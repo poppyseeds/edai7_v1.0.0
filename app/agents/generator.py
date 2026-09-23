@@ -33,15 +33,19 @@ class GeneratorAgent:
         plan: GenerationPlan,
         output_path: str | Path | None = None,
     ) -> pd.DataFrame:
+        if not plan.generation_needed or plan.num_samples <= 0:
+            logger.info("Generation not needed; returning empty synthetic dataframe")
+            return df.iloc[0:0].copy()
         if len(df) < 10:
             raise GeneratorError("Need at least 10 rows to fit a generator.")
         generator = self._registry.get(plan.generator)
         if generator is None:
             raise GeneratorError(f"Unknown generator '{plan.generator}'.")
+        fit_df = self._training_frame_for_plan(df, plan)
 
         try:
             synthetic = generator.generate(
-                df=df,
+                df=fit_df,
                 num_samples=plan.num_samples,
                 random_state=plan.random_state,
                 epochs=plan.epochs,
@@ -49,14 +53,20 @@ class GeneratorAgent:
         except Exception as exc:
             logger.warning("%s failed (%s); using bootstrap fallback", plan.generator, exc)
             synthetic = self._fallback.generate(
-                df=df,
+                df=fit_df,
                 num_samples=plan.num_samples,
                 random_state=plan.random_state,
             )
 
         synthetic = self._align_schema(df, synthetic)
-        if plan.target_strategy == "minority_oversampling" and plan.target_column:
+        if plan.generation_mode in {"minority_augmentation", "moderate_minority_augmentation"} and plan.target_column:
             synthetic = self._boost_minority(df, synthetic, plan)
+        if len(synthetic) != plan.num_samples:
+            logger.warning(
+                "Requested %s synthetic rows but generated %s rows",
+                plan.num_samples,
+                len(synthetic),
+            )
 
         if output_path is not None:
             path = Path(output_path)
@@ -64,6 +74,30 @@ class GeneratorAgent:
             synthetic.to_csv(path, index=False)
             logger.info("Saved synthetic data to %s", path)
         return synthetic
+
+    def _training_frame_for_plan(self, original: pd.DataFrame, plan: GenerationPlan) -> pd.DataFrame:
+        if (
+            plan.generation_mode in {"minority_augmentation", "moderate_minority_augmentation"}
+            and plan.target_column
+            and plan.target_class is not None
+            and plan.target_column in original.columns
+        ):
+            target = plan.target_column
+            minority = original[original[target].astype(str) == str(plan.target_class)]
+            if len(minority) >= 10:
+                logger.info(
+                    "Training %s on %s rows from target class %s",
+                    plan.generator,
+                    len(minority),
+                    plan.target_class,
+                )
+                return minority.reset_index(drop=True)
+            logger.warning(
+                "Minority class %s has only %s rows; using full dataset with post-filtering",
+                plan.target_class,
+                len(minority),
+            )
+        return original
 
     def _align_schema(self, original: pd.DataFrame, synthetic: pd.DataFrame) -> pd.DataFrame:
         missing = [c for c in original.columns if c not in synthetic.columns]
@@ -85,8 +119,10 @@ class GeneratorAgent:
         if target not in original.columns or target not in synthetic.columns:
             return synthetic
         counts = original[target].value_counts()
-        minority_label = counts.idxmin()
+        minority_label = plan.target_class if plan.target_class is not None else counts.idxmin()
         minority = synthetic[synthetic[target] == minority_label]
+        if minority.empty:
+            minority = synthetic[synthetic[target].astype(str) == str(minority_label)]
         if minority.empty:
             return synthetic
         needed = plan.num_samples

@@ -17,6 +17,16 @@ class Settings(BaseSettings):
 
     max_iterations: int = 3
     default_synthetic_ratio: float = 0.3
+    minority_target_ratio: float = 0.50
+    moderate_imbalance_target_ratio: float = 0.40
+    small_dataset_threshold: int = 1000
+    small_dataset_augmentation_ratio: float = 0.50
+    low_diversity_augmentation_ratio: float = 0.30
+    general_augmentation_ratio: float = 0.20
+    max_generation_ratio_per_iteration: float = 0.50
+    max_total_synthetic_ratio: float = 1.50
+    sample_count_increase_factor: float = 1.50
+    sample_count_decrease_factor: float = 0.75
     random_state: int = 42
     ctgan_epochs: int = 10
     tvae_epochs: int = 10

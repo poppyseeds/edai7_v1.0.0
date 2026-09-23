@@ -17,6 +17,7 @@ from app.agents.planner import GenerationPlanner
 from app.agents.validator import ValidationAgent
 from app.config import get_settings
 from app.evaluation.fairness import group_performance
+from app.evaluation.unsupervised_utility import evaluate_unsupervised_utility
 from app.evaluation.watermark import provenance_fingerprint
 from app.models.benchmark_model import DownstreamModel
 from app.schemas.schemas import (
@@ -42,6 +43,7 @@ class PipelineConfig:
     min_improvement: float | None = None
     test_size: float | None = None
     enable_llm: bool = True
+    auto_detect_target: bool = False
     preferred_generator: str | None = None
     sensitive_column: str | None = None
     output_dir: str | Path | None = None
@@ -90,14 +92,23 @@ def run_pipeline(
     optimizer = OptimizationAgent()
     reasoner = LLMReasoner() if cfg.enable_llm else None
 
-    analysis = analyzer.analyze(df, target_column=target_column)
+    auto_detect_target = cfg.auto_detect_target or target_column == "__auto__"
+    explicit_target = None if target_column == "__auto__" else target_column
+    analysis = analyzer.analyze(
+        df,
+        target_column=explicit_target,
+        auto_detect_target=auto_detect_target,
+    )
     log("Analyzer", "Starting dataset analysis")
     log("Analyzer", f"Shape={analysis.rows}x{analysis.columns}; issues={analysis.issues}")
 
     target = analysis.target_column
-    if not target:
-        raise PipelineError("Could not determine a target column.")
-    if target not in df.columns:
+    evaluation_mode = "labeled" if target else "unlabeled"
+    if target:
+        log("Analyzer", f"Target detected: {target}")
+    else:
+        log("Analyzer", "No target column selected")
+    if target and target not in df.columns:
         raise PipelineError(f"Target '{target}' is not in the dataset.")
 
     llm_summaries: dict[str, str] = {}
@@ -133,7 +144,13 @@ def run_pipeline(
         ctgan_epochs=ctgan_epochs,
         tvae_epochs=tvae_epochs,
     )
+    log("Planner", f"Dataset classified as {evaluation_mode}")
     log("Planner", f"Selected {plan.generator}: {plan.reason}")
+    log(
+        "SamplePlanner",
+        f"Original rows={analysis.rows}; planned synthetic rows={plan.num_samples}; "
+        f"mode={plan.generation_mode}; needed={plan.generation_needed}",
+    )
     if reasoner:
         llm_summaries["plan"] = reasoner.explain(plan.model_dump(), "plan")
 
@@ -145,12 +162,81 @@ def run_pipeline(
     best_score = float("-inf")
     improved = False
     fit_df = train if train is not None else df
+    cumulative_synthetic_rows = 0
+
+    if not plan.generation_needed:
+        log("SamplePlanner", plan.sample_count_reason or "Synthetic generation not justified.")
+        result = PipelineResult(
+            run_id=run_id,
+            timestamp=utc_now(),
+            evaluation_mode=evaluation_mode,  # type: ignore[arg-type]
+            target_column=target,
+            dataset_filename=cfg.dataset_filename,
+            dataset_analysis=analysis,
+            baseline=baseline_metrics,
+            iterations=[],
+            optimization_history=[],
+            agent_logs=logs,
+            llm_summaries=llm_summaries,
+            final_evaluation={
+                "evaluation_mode": evaluation_mode,
+                "generation_needed": False,
+                "reason": plan.sample_count_reason or plan.reason,
+            },
+            final_decision="skipped_generation_not_needed",
+            improved=False,
+            final_dataset_path=None,
+            best_iteration=None,
+        )
+        (output_dir / f"{run_id}_result.json").write_text(
+            result.model_dump_json(indent=2), encoding="utf-8"
+        )
+        return PipelineOutput(
+            result=result,
+            synthetic_df=None,
+            original_df=df,
+            train_df=train,
+            test_df=test,
+        )
 
     for i in range(1, max_iterations + 1):
+        max_total_synthetic = int(analysis.rows * settings.max_total_synthetic_ratio)
+        remaining_total = max_total_synthetic - cumulative_synthetic_rows
+        if remaining_total <= 0:
+            log("Optimizer", "Maximum total synthetic row budget reached")
+            break
+        if plan.num_samples > remaining_total:
+            log(
+                "SamplePlanner",
+                f"Capping iteration request from {plan.num_samples} to {remaining_total} "
+                "due to total synthetic row budget.",
+            )
+            plan = plan.model_copy(
+                update={
+                    "num_samples": remaining_total,
+                    "samples_to_generate": remaining_total,
+                    "sample_count_details": {
+                        **plan.sample_count_details,
+                        "total_budget_cap_applied": True,
+                    },
+                }
+            )
+
         log("Generator", f"Training {plan.generator}")
+        log(
+            "SamplePlanner",
+            f"Iteration {i}: requesting {plan.num_samples} rows "
+            f"(cumulative before={cumulative_synthetic_rows})",
+        )
         synth_path = output_dir / f"{run_id}_iter{i}_{plan.generator}.csv"
         synthetic = generator_agent.generate(fit_df, plan, output_path=synth_path)
         log("Generator", f"Generated {len(synthetic)} rows")
+        if len(synthetic) != plan.num_samples:
+            log(
+                "Generator",
+                f"Warning: requested {plan.num_samples} rows but generated {len(synthetic)} rows",
+            )
+        cumulative_synthetic_rows += len(synthetic)
 
         validation = validator.validate(fit_df, synthetic, random_state=random_state)
         log("Validator", f"Fidelity score: {validation.fidelity_score:.3f}")
@@ -160,6 +246,7 @@ def run_pipeline(
             )
 
         bench = None
+        utility = None
         iter_score = validation.overall_score
         if train is not None and test is not None and analysis.task_type:
             bench = benchmark_agent.compare(
@@ -181,12 +268,26 @@ def run_pipeline(
                     {"improved": bench.improved, "benchmark": bench.model_dump()},
                     "iteration",
                 )
+        else:
+            utility = evaluate_unsupervised_utility(fit_df, synthetic)
+            log("Utility", f"Statistical utility: {utility.overall_score:.3f}")
+            iter_score = utility.overall_score
+            if reasoner:
+                llm_summaries[f"iteration_{i}"] = reasoner.explain(
+                    {"utility": utility.model_dump(), "validation": validation.model_dump()},
+                    "iteration",
+                )
 
         record = IterationRecord(
             iteration=i,
             plan=plan,
             validation=validation,
             benchmark=bench,
+            unsupervised_utility=utility,
+            samples_requested=plan.num_samples,
+            samples_generated=len(synthetic),
+            cumulative_synthetic_rows=cumulative_synthetic_rows,
+            decision="pending",
             synthetic_rows=len(synthetic),
             synthetic_path=str(synth_path),
         )
@@ -198,18 +299,32 @@ def run_pipeline(
             best_iter = i
 
         tried = [rec.plan.generator for rec in iterations]
-        decision = optimizer.decide(
-            iteration=i,
-            max_iterations=max_iterations,
-            current_plan=plan,
-            benchmark=bench,
-            validation=validation,
-            tried_generators=tried,
-        )
+        if evaluation_mode == "labeled":
+            decision = optimizer.decide(
+                iteration=i,
+                max_iterations=max_iterations,
+                current_plan=plan,
+                benchmark=bench,
+                validation=validation,
+                tried_generators=tried,
+            )
+        else:
+            decision = optimizer.decide_unlabeled(
+                iteration=i,
+                max_iterations=max_iterations,
+                current_plan=plan,
+                validation=validation,
+                utility=utility,
+                tried_generators=tried,
+            )
         decisions.append(decision)
+        record.decision = "accepted" if decision.accept else ("retry" if decision.continue_loop else "stopped")
         if decision.accept:
             improved = True
-            log("Optimizer", "Improvement detected")
+            log(
+                "Optimizer",
+                "Utility improved" if evaluation_mode == "labeled" else "Synthetic-data quality improved",
+            )
             best_synth = synthetic
             best_path = str(synth_path)
             best_iter = i
@@ -228,8 +343,25 @@ def run_pipeline(
             generator=decision.next_generator,  # type: ignore[arg-type]
             num_samples=decision.num_samples or plan.num_samples,
             reason=decision.reason,
+            generation_needed=True,
+            generation_mode=plan.generation_mode,
             target_column=plan.target_column,
+            target_class=plan.target_class,
             target_strategy=plan.target_strategy,
+            original_rows=plan.original_rows,
+            current_target_count=plan.current_target_count,
+            desired_target_count=plan.desired_target_count,
+            samples_to_generate=decision.num_samples or plan.num_samples,
+            augmentation_ratio=(
+                (decision.num_samples or plan.num_samples) / max(plan.original_rows or analysis.rows, 1)
+            ),
+            max_allowed_samples=plan.max_allowed_samples,
+            sample_count_reason=decision.reason,
+            sample_count_details={
+                **plan.sample_count_details,
+                "adjusted_by_optimizer": True,
+                "previous_iteration": i,
+            },
             epochs=epochs,
             random_state=random_state,
             preserve_columns=plan.preserve_columns,
@@ -254,6 +386,11 @@ def run_pipeline(
             groups=test[cfg.sensitive_column],
             task_type="classification",
         )
+    elif cfg.sensitive_column and evaluation_mode == "unlabeled":
+        log(
+            "Fairness",
+            "Skipped fairness evaluation: no target column available for supervised group metrics.",
+        )
 
     provenance = None
     if best_synth is not None:
@@ -274,9 +411,25 @@ def run_pipeline(
     else:
         log("Pipeline", "Completed successfully")
 
+    final_evaluation = {}
+    if best_iter is not None and iterations:
+        best_record = next((rec for rec in iterations if rec.iteration == best_iter), iterations[-1])
+        final_evaluation = {
+            "evaluation_mode": evaluation_mode,
+            "validation": best_record.validation.model_dump(),
+            "benchmark": best_record.benchmark.model_dump() if best_record.benchmark else None,
+            "unsupervised_utility": (
+                best_record.unsupervised_utility.model_dump()
+                if best_record.unsupervised_utility
+                else None
+            ),
+        }
+
     result = PipelineResult(
         run_id=run_id,
         timestamp=utc_now(),
+        evaluation_mode=evaluation_mode,  # type: ignore[arg-type]
+        target_column=target,
         dataset_filename=cfg.dataset_filename,
         dataset_analysis=analysis,
         baseline=baseline_metrics,
@@ -286,6 +439,7 @@ def run_pipeline(
         llm_summaries=llm_summaries,
         fairness=fairness,
         provenance=provenance,
+        final_evaluation=final_evaluation,
         final_decision=final_decision,
         improved=improved,
         final_dataset_path=best_path,

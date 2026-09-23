@@ -10,6 +10,8 @@ Scores:
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -21,7 +23,7 @@ def basic_privacy_indicators(
     synthetic: pd.DataFrame,
     sample_size: int = 80,
     random_state: int = 42,
-) -> tuple[float, dict[str, float]]:
+) -> tuple[float, dict[str, Any]]:
     orig_t = original.astype(str).apply(lambda r: tuple(r.tolist()), axis=1)
     syn_t = synthetic.astype(str).apply(lambda r: tuple(r.tolist()), axis=1)
     orig_set = set(orig_t.tolist())
@@ -33,12 +35,22 @@ def basic_privacy_indicators(
     privacy_score = float(
         np.clip(1.0 - 0.7 * exact_duplicate_rate - 0.3 * high_similarity_rate, 0.0, 1.0)
     )
-    details = {
+    details: dict[str, Any] = {
         "exact_duplicate_rate": exact_duplicate_rate,
         "high_similarity_rate": high_similarity_rate,
         "membership_risk_indicator": exact_duplicate_rate + 0.5 * high_similarity_rate,
+        "privacy_risk_level": _risk_level(exact_duplicate_rate, high_similarity_rate),
     }
     return privacy_score, details
+
+
+def _risk_level(exact_duplicate_rate: float, high_similarity_rate: float) -> str:
+    indicator = exact_duplicate_rate + 0.5 * high_similarity_rate
+    if indicator >= 0.20:
+        return "HIGH"
+    if indicator >= 0.08:
+        return "MEDIUM"
+    return "LOW"
 
 
 def _nearest_neighbor_rate(

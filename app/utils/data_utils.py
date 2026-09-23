@@ -121,28 +121,22 @@ def create_sample_churn_dataset(
     existing_loans = rng.integers(0, 6, size=n_rows)
     tenure_months = rng.integers(1, 72, size=n_rows)
 
-    logit = (
-        -2.8
-        + 1.6 * (employment == "unemployed")
-        + 0.7 * (employment == "self-employed")
-        + 0.00004 * (loan_amount - 18000)
-        - 0.008 * (credit_score - 600)
-        + 0.25 * (existing_loans >= 4)
-        - 0.00001 * (income - 50000)
+    # Rank-based target assignment keeps the target imbalanced while making the
+    # minority class learnable enough for the augmentation demo.
+    risk_score = (
+        1.9 * (employment == "unemployed")
+        + 0.9 * (employment == "self-employed")
+        + 0.000055 * loan_amount
+        - 0.012 * credit_score
+        + 0.42 * existing_loans
+        - 0.000018 * income
+        - 0.018 * tenure_months
+        + rng.normal(0, 0.35, size=n_rows)
     )
-    prob = 1 / (1 + np.exp(-logit))
-    target = (rng.random(n_rows) < prob).astype(int)
-
-    # Force ~10% positive class for a clear imbalance demo.
     desired_pos = max(1, int(0.10 * n_rows))
-    pos_idx = np.where(target == 1)[0]
-    neg_idx = np.where(target == 0)[0]
-    if len(pos_idx) > desired_pos:
-        drop = rng.choice(pos_idx, size=len(pos_idx) - desired_pos, replace=False)
-        target[drop] = 0
-    elif len(pos_idx) < desired_pos:
-        add = rng.choice(neg_idx, size=desired_pos - len(pos_idx), replace=False)
-        target[add] = 1
+    target = np.zeros(n_rows, dtype=int)
+    positive_idx = np.argsort(risk_score)[-desired_pos:]
+    target[positive_idx] = 1
 
     df = pd.DataFrame(
         {
@@ -155,6 +149,38 @@ def create_sample_churn_dataset(
             "city": city,
             "tenure_months": tenure_months,
             "target": target,
+        }
+    )
+    return save_csv(df, path)
+
+
+def create_unlabeled_customer_dataset(
+    path: str | Path,
+    n_rows: int = 500,
+    seed: int = 123,
+) -> Path:
+    """Create an unlabeled customer-style CSV with no target column."""
+    rng = np.random.default_rng(seed)
+    city = rng.choice(["Mumbai", "Pune", "Delhi", "Bengaluru"], size=n_rows)
+    age = rng.integers(22, 70, size=n_rows)
+    income = rng.normal(76000, 24000, size=n_rows).clip(18000, 200000).round(0)
+    credit_score = rng.normal(685, 75, size=n_rows).clip(300, 850).round(0)
+    spending = (
+        0.18 * income
+        + rng.normal(8000, 5000, size=n_rows)
+        + (city == "Mumbai") * 3500
+        - (credit_score < 600) * 2500
+    ).clip(1000, 90000).round(0)
+    visits_per_month = rng.poisson(4, size=n_rows).clip(0, 20)
+
+    df = pd.DataFrame(
+        {
+            "age": age,
+            "income": income,
+            "city": city,
+            "credit_score": credit_score,
+            "spending": spending,
+            "visits_per_month": visits_per_month,
         }
     )
     return save_csv(df, path)
