@@ -28,12 +28,13 @@ class DatasetAnalysis(BaseModel):
     categorical_distributions: dict[str, dict[str, float]]
     low_cardinality_columns: list[str]
     correlations: dict[str, dict[str, float]] = Field(default_factory=dict)
+    semantic_types: dict[str, dict[str, Any]] = Field(default_factory=dict)
     issues: list[str]
     issue_details: dict[str, str] = Field(default_factory=dict)
 
 
 class GenerationPlan(BaseModel):
-    generator: Literal["ctgan", "tvae", "gaussian_copula"]
+    generator: Literal["ctgan", "tvae", "gaussian_copula", "bootstrap"]
     num_samples: int
     reason: str
     generation_needed: bool = True
@@ -63,6 +64,7 @@ class ValidationResult(BaseModel):
     privacy_score: float
     overall_score: float
     passed: bool
+    constraint_score: float | None = None
     details: dict[str, Any] = Field(default_factory=dict)
     metric_notes: dict[str, str] = Field(default_factory=dict)
 
@@ -109,6 +111,45 @@ class BenchmarkResult(BaseModel):
     min_relative_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
     notes: str = ""
+
+
+class CrossValidatedModelResult(BaseModel):
+    model_name: str
+    primary_metric: str
+    mean_primary_value: float
+    std_primary_value: float
+    fold_primary_values: list[float] = Field(default_factory=list)
+
+
+class ModelSuiteResult(BaseModel):
+    task_type: str
+    primary_metric: str
+    folds: int
+    models: dict[str, CrossValidatedModelResult] = Field(default_factory=dict)
+    median_primary_value: float | None = None
+
+
+class CandidateEvaluation(BaseModel):
+    candidate_id: str
+    generator_name: str
+    hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    requested_samples: int
+    generated_samples: int = 0
+    validity_score: float | None = None
+    distribution_score: float | None = None
+    dependency_score: float | None = None
+    multivariate_score: float | None = None
+    diversity_score: float | None = None
+    discriminator_score: float | None = None
+    privacy_score: float | None = None
+    exact_match_rate: float | None = None
+    privacy_risk_level: str | None = None
+    downstream_cv: ModelSuiteResult | None = None
+    passed_hard_gates: bool = False
+    failed_gates: list[str] = Field(default_factory=list)
+    pareto_optimal: bool = False
+    selected: bool = False
+    failure_reason: str | None = None
 
 
 class OptimizationDecision(BaseModel):

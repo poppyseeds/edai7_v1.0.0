@@ -14,7 +14,7 @@ from app.utils.logging_config import get_logger
 
 logger = get_logger("Optimizer")
 
-GENERATOR_CYCLE = ("ctgan", "tvae", "gaussian_copula")
+GENERATOR_CYCLE = ("ctgan", "tvae", "gaussian_copula", "bootstrap")
 SAMPLE_COUNT_FACTORS = (0.50, 0.75, 1.00, 1.25)
 
 

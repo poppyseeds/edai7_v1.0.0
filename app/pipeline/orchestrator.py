@@ -161,6 +161,10 @@ def run_pipeline(
     best_path: str | None = None
     best_iter: int | None = None
     best_score = float("-inf")
+    fallback_synth: pd.DataFrame | None = None
+    fallback_path: str | None = None
+    fallback_iter: int | None = None
+    fallback_score = float("-inf")
     improved = False
     fit_df = train if train is not None else df
     cumulative_synthetic_rows = 0
@@ -315,7 +319,18 @@ def run_pipeline(
             synthetic_path=str(synth_path),
         )
         iterations.append(record)
-        if iter_score > best_score:
+        hard_gate_failures = _hard_gate_failures(validation)
+        if iter_score > fallback_score:
+            fallback_score = iter_score
+            fallback_synth = synthetic
+            fallback_path = str(synth_path)
+            fallback_iter = i
+        if hard_gate_failures:
+            log(
+                "Selection",
+                f"Iteration {i} rejected by hard gates: {', '.join(hard_gate_failures)}",
+            )
+        elif iter_score > best_score:
             best_score = iter_score
             best_synth = synthetic
             best_path = str(synth_path)
@@ -424,6 +439,15 @@ def run_pipeline(
         meta_path = output_dir / f"{run_id}_provenance.json"
         meta_path.write_text(provenance.model_dump_json(indent=2), encoding="utf-8")
 
+    if best_synth is None and fallback_synth is not None:
+        best_synth = fallback_synth
+        best_path = fallback_path
+        best_iter = fallback_iter
+        log(
+            "Selection",
+            "No candidate passed all hard gates; retaining the best rejected candidate for audit only.",
+        )
+
     best_record = None
     if best_iter is not None and iterations:
         best_record = next((rec for rec in iterations if rec.iteration == best_iter), iterations[-1])
@@ -432,12 +456,14 @@ def run_pipeline(
                 best_record.benchmark
                 and best_record.benchmark.improved
                 and best_record.validation.passed
+                and not _hard_gate_failures(best_record.validation)
             )
         else:
             improved = bool(
                 best_record.unsupervised_utility
                 and best_record.unsupervised_utility.passed
                 and best_record.validation.passed
+                and not _hard_gate_failures(best_record.validation)
             )
         best_record.decision = "accepted" if improved else "best_candidate_not_accepted"
         log(
@@ -499,3 +525,21 @@ def run_pipeline(
         train_df=train,
         test_df=test,
     )
+
+
+def _hard_gate_failures(validation) -> list[str]:
+    """Keep privacy and validity as non-compensating selection requirements."""
+
+    settings = get_settings()
+    failures: list[str] = []
+    privacy_details = validation.details.get("privacy", {})
+    exact_rate = privacy_details.get("exact_duplicate_rate")
+    if validation.privacy_score < settings.min_privacy_score:
+        failures.append("privacy_score_below_threshold")
+    if isinstance(exact_rate, (int, float)) and exact_rate > settings.max_exact_match_rate:
+        failures.append("exact_match_rate_above_threshold")
+    if validation.constraint_score is None or validation.constraint_score < settings.min_validity_score:
+        failures.append("validity_score_below_threshold")
+    if validation.distribution_score < settings.min_distribution_score:
+        failures.append("distribution_score_below_threshold")
+    return failures

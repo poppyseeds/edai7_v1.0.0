@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
 from app.config import get_settings
 from app.evaluation.utility import primary_improvement
 from app.models.benchmark_model import DownstreamModel
-from app.schemas.schemas import BenchmarkResult, ModelMetrics
+from app.schemas.schemas import (
+    BenchmarkResult,
+    CrossValidatedModelResult,
+    ModelMetrics,
+    ModelSuiteResult,
+)
 from app.utils.exceptions import BenchmarkError
 from app.utils.logging_config import get_logger
 
@@ -16,6 +22,79 @@ logger = get_logger("Benchmark")
 
 
 class BenchmarkAgent:
+    def evaluate_model_suite_cv(
+        self,
+        train: pd.DataFrame,
+        target_column: str,
+        task_type: str,
+        random_state: int = 42,
+        folds: int | None = None,
+    ) -> ModelSuiteResult:
+        """Evaluate several downstream models using training data only.
+
+        This helper deliberately accepts only a training dataframe. The pipeline
+        can use it for candidate ranking without exposing its final test split.
+        """
+
+        if target_column not in train.columns:
+            raise BenchmarkError(f"Missing target column '{target_column}'.")
+        requested_folds = folds or get_settings().cv_folds
+        splitter = self._make_cv_splitter(train[target_column], task_type, requested_folds, random_state)
+        names = (
+            ("logistic_regression", "random_forest", "hist_gradient_boosting")
+            if task_type == "classification"
+            else ("ridge", "random_forest", "hist_gradient_boosting")
+        )
+        results: dict[str, CrossValidatedModelResult] = {}
+        for name in names:
+            values: list[float] = []
+            for train_index, valid_index in splitter.split(
+                train, train[target_column] if task_type == "classification" else None
+            ):
+                fold_train = train.iloc[train_index].reset_index(drop=True)
+                fold_valid = train.iloc[valid_index].reset_index(drop=True)
+                metrics = self.evaluate_split(
+                    fold_train,
+                    fold_valid,
+                    target_column,
+                    task_type,
+                    random_state=random_state,
+                    model_name=name,
+                )
+                values.append(metrics.primary_value)
+            results[name] = CrossValidatedModelResult(
+                model_name=name,
+                primary_metric="f1" if task_type == "classification" else "r2",
+                mean_primary_value=round(float(np.mean(values)), 6),
+                std_primary_value=round(float(np.std(values, ddof=0)), 6),
+                fold_primary_values=[round(float(value), 6) for value in values],
+            )
+        median = float(np.median([result.mean_primary_value for result in results.values()]))
+        return ModelSuiteResult(
+            task_type=task_type,
+            primary_metric="f1" if task_type == "classification" else "r2",
+            folds=requested_folds,
+            models=results,
+            median_primary_value=round(median, 6),
+        )
+
+    @staticmethod
+    def _make_cv_splitter(
+        target: pd.Series,
+        task_type: str,
+        folds: int,
+        random_state: int):
+        if folds < 2:
+            raise BenchmarkError("Cross-validation requires at least two folds.")
+        if task_type == "classification":
+            minimum_class_count = int(target.value_counts().min())
+            usable_folds = min(folds, minimum_class_count)
+            if usable_folds < 2:
+                raise BenchmarkError("Cross-validation requires at least two rows per class.")
+            return StratifiedKFold(n_splits=usable_folds, shuffle=True, random_state=random_state)
+        if len(target) < folds:
+            raise BenchmarkError("Cross-validation folds exceed available training rows.")
+        return KFold(n_splits=folds, shuffle=True, random_state=random_state)
     def split(
         self,
         df: pd.DataFrame,

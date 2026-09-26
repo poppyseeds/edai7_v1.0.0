@@ -2,6 +2,8 @@ import pandas as pd
 import pytest
 
 from app.pipeline.orchestrator import PipelineConfig, run_pipeline
+from app.pipeline.orchestrator import _hard_gate_failures
+from app.schemas.schemas import ValidationResult
 from app.utils.data_utils import create_sample_churn_dataset, create_unlabeled_customer_dataset
 
 
@@ -143,3 +145,22 @@ def test_unlabeled_numerical_only_pipeline_succeeds(tmp_path) -> None:
     )
     assert output.result.evaluation_mode == "unlabeled"
     assert output.synthetic_df is not None
+
+
+def test_hard_gates_reject_memorizing_candidate() -> None:
+    validation = ValidationResult(
+        fidelity_score=1.0,
+        distribution_score=1.0,
+        correlation_score=1.0,
+        diversity_score=1.0,
+        privacy_score=0.2,
+        constraint_score=1.0,
+        overall_score=0.9,
+        passed=True,
+        details={"privacy": {"exact_duplicate_rate": 0.5}},
+    )
+
+    failures = _hard_gate_failures(validation)
+
+    assert "privacy_score_below_threshold" in failures
+    assert "exact_match_rate_above_threshold" in failures

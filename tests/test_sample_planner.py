@@ -6,11 +6,14 @@ from app.agents.planner import GenerationPlanner
 from app.agents.sample_planner import SamplePlanner
 from app.schemas.schemas import (
     BenchmarkResult,
+    CandidateEvaluation,
     GenerationPlan,
     ModelMetrics,
     OptimizationDecision,
     ValidationResult,
 )
+from app.pipeline.candidates import CandidateCache, propose_candidates
+from app.pipeline.selection import select_candidate
 
 
 def _labeled_counts(zeros: int, ones: int) -> pd.DataFrame:
@@ -207,3 +210,40 @@ def test_generation_planner_applies_synthetic_ratio_to_non_minority_expansion() 
     plan = GenerationPlanner().plan(analysis, synthetic_ratio=0.30)
     assert plan.num_samples == 60
     assert plan.sample_count_details["synthetic_ratio_applied"] is True
+
+
+def test_candidate_proposals_include_bootstrap_and_cache_isolated_values() -> None:
+    plan = GenerationPlan(
+        generator="ctgan", num_samples=40, reason="test", original_rows=100, max_allowed_samples=50
+    )
+    candidates = propose_candidates(plan)
+    cache = CandidateCache()
+    source = pd.DataFrame({"feature": [1, 2]})
+    key = candidates[0].cache_key(source, random_state=42, condition=None)
+    cache.put(key, source)
+    cached = cache.get(key)
+    assert "bootstrap" in {candidate.generator_name for candidate in candidates}
+    assert cached is not None
+    cached.loc[0, "feature"] = 99
+    assert cache.get(key).loc[0, "feature"] == 1
+
+
+def test_selection_rejects_high_utility_candidate_that_fails_privacy_gate() -> None:
+    unsafe = CandidateEvaluation(
+        candidate_id="unsafe", generator_name="bootstrap", requested_samples=10,
+        validity_score=1.0, distribution_score=1.0, dependency_score=1.0,
+        multivariate_score=1.0, diversity_score=1.0, discriminator_score=1.0,
+        privacy_score=0.10, exact_match_rate=0.8,
+    )
+    safe = CandidateEvaluation(
+        candidate_id="safe", generator_name="ctgan", requested_samples=10,
+        validity_score=1.0, distribution_score=0.8, dependency_score=0.8,
+        multivariate_score=0.8, diversity_score=0.8, discriminator_score=0.8,
+        privacy_score=0.9, exact_match_rate=0.0,
+    )
+
+    winner = select_candidate([unsafe, safe], "unlabeled")
+
+    assert winner is safe
+    assert "privacy_score_below_threshold" in unsafe.failed_gates
+    assert unsafe.selected is False

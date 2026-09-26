@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from app.agents.analyzer import DatasetAnalyzer
-from app.utils.data_utils import create_sample_churn_dataset
+from app.utils.data_utils import create_sample_churn_dataset, infer_semantic_types
 
 
 @pytest.fixture
@@ -74,3 +74,30 @@ def test_sample_dataset_is_imbalanced(tmp_path) -> None:
     analysis = DatasetAnalyzer().analyze(df, target_column="target")
     pos = analysis.class_distribution["1"]
     assert 0.05 <= pos <= 0.20
+
+
+def test_semantic_inference_detects_common_tabular_roles() -> None:
+    df = pd.DataFrame(
+        {
+            "customer_id": range(100, 112),
+            "is_active": ["yes", "no"] * 6,
+            "joined_date": [f"2024-01-{day:02d}" for day in range(1, 13)],
+            "risk_level": ["low", "medium", "high"] * 4,
+            "notes": [f"This is a sufficiently long free-text note for record {index}." for index in range(12)],
+            "target": [0, 1] * 6,
+        }
+    )
+
+    semantic = infer_semantic_types(df, target_column="target")
+
+    assert semantic["customer_id"]["semantic_type"] == "identifier"
+    assert semantic["is_active"]["semantic_type"] == "boolean"
+    assert semantic["joined_date"]["semantic_type"] == "datetime"
+    assert semantic["risk_level"]["semantic_type"] == "ordinal"
+    assert semantic["notes"]["semantic_type"] == "free_text"
+    assert semantic["target"]["semantic_type"] == "target"
+
+
+def test_analysis_exposes_semantic_types(messy_df: pd.DataFrame) -> None:
+    analysis = DatasetAnalyzer().analyze(messy_df, target_column="target")
+    assert analysis.semantic_types["target"]["semantic_type"] == "target"

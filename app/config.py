@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     min_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
     validation_pass_threshold: float = 0.55
+    evaluation_sample_cap: int = 500
+    enable_mmd: bool = True
+    enable_discriminator_ensemble: bool = True
+    cv_folds: int = 3
+    enable_candidate_search: bool = True
+    max_generator_candidates: int = 8
+    max_search_trials: int = 8
+    min_privacy_score: float = 0.70
+    max_exact_match_rate: float = 0.05
+    min_validity_score: float = 0.95
+    min_distribution_score: float = 0.60
     log_level: str = "INFO"
     generated_dir: str = "generated"
     uploads_dir: str = "datasets/uploads"

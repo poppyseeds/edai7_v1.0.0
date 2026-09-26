@@ -29,6 +29,7 @@ class GeneratorAgent:
             "ctgan": CTGANGenerator(),
             "tvae": TVAEGenerator(),
             "gaussian_copula": GaussianCopulaGenerator(),
+            "bootstrap": BootstrapGenerator(),
         }
 
         self._fallback = BootstrapGenerator()

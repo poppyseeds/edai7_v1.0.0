@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import (
@@ -76,15 +81,23 @@ class DownstreamModel:
         if self.task_type == "classification":
             if self.model_name == "logistic_regression":
                 return LogisticRegression(max_iter=400, random_state=self.random_state)
+            if self.model_name == "hist_gradient_boosting":
+                return HistGradientBoostingClassifier(random_state=self.random_state)
             return RandomForestClassifier(
-                n_estimators=80,
+                n_estimators=150,
+                max_features="sqrt",
+                min_samples_leaf=2,
                 random_state=self.random_state,
                 n_jobs=1,
             )
         if self.model_name == "ridge":
             return Ridge(random_state=self.random_state)
+        if self.model_name == "hist_gradient_boosting":
+            return HistGradientBoostingRegressor(random_state=self.random_state)
         return RandomForestRegressor(
-            n_estimators=80,
+            n_estimators=150,
+            max_features=1.0,
+            min_samples_leaf=2,
             random_state=self.random_state,
             n_jobs=1,
         )
