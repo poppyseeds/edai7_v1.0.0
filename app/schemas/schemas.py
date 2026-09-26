@@ -179,7 +179,7 @@ class PipelineConfigModel(BaseModel):
     max_iterations: int = 3
     random_state: int = 42
     synthetic_ratio: float = 0.3
-    ctgan_epochs: int = 10
+    ctgan_epochs: int | None = None
     tvae_epochs: int = 10
     min_improvement: float = 0.005
     test_size: float = 0.25

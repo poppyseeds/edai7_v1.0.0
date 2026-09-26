@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     sample_count_increase_factor: float = 1.50
     sample_count_decrease_factor: float = 0.75
     random_state: int = 42
-    ctgan_epochs: int = 10
+    # Leave unset to use CTGANGenerator's size-aware prototype default.
+    ctgan_epochs: int | None = None
     tvae_epochs: int = 10
     max_upload_mb: int = 20
     min_rows: int = 20
