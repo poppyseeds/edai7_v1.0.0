@@ -164,3 +164,15 @@ def test_hard_gates_reject_memorizing_candidate() -> None:
 
     assert "privacy_score_below_threshold" in failures
     assert "exact_match_rate_above_threshold" in failures
+
+
+def test_pipeline_always_returns_a_deterministic_final_report(tmp_path) -> None:
+    path = tmp_path / "unlabeled.csv"
+    create_unlabeled_customer_dataset(path, n_rows=40, seed=4)
+    output = run_pipeline(
+        pd.read_csv(path),
+        config=PipelineConfig(max_iterations=1, enable_llm=False, preferred_generator="gaussian_copula", output_dir=tmp_path),
+    )
+
+    assert "Executive Summary" in output.result.final_report
+    assert "Privacy and Reliability" in output.result.final_report

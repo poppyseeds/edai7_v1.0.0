@@ -11,6 +11,7 @@ from app.evaluation.advanced_similarity import (
 )
 from app.models.benchmark_model import DownstreamModel
 from app.agents.benchmark import BenchmarkAgent
+from app.agents.llm_reasoner import LLMReasoner
 
 
 def test_fidelity_identical_tables() -> None:
@@ -102,3 +103,11 @@ def test_model_suite_cross_validation_reports_all_cpu_models() -> None:
     assert set(result.models) == {"logistic_regression", "random_forest", "hist_gradient_boosting"}
     assert result.median_primary_value is not None
     assert all(len(item.fold_primary_values) == 3 for item in result.models.values())
+
+
+def test_gemini_final_report_uses_fallback_when_key_is_missing(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    reasoner = LLMReasoner()
+    fallback = "Deterministic report"
+
+    assert reasoner.explain_final_report({"dataset": {"rows": 20}}, fallback) == fallback

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     enable_candidate_search: bool = True
     max_generator_candidates: int = 8
     max_search_trials: int = 8
+    enable_experimental_generators: bool = False
     min_privacy_score: float = 0.70
     max_exact_match_rate: float = 0.05
     min_validity_score: float = 0.95

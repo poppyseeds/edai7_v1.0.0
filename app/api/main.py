@@ -16,6 +16,7 @@ from fastapi.encoders import jsonable_encoder
 from app import __version__
 from app.agents.analyzer import DatasetAnalyzer
 from app.agents.generator import GeneratorAgent
+from app.generators.registry import get_available_generators
 from app.agents.planner import GenerationPlanner
 from app.config import get_settings
 from app.pipeline.orchestrator import PipelineConfig, run_pipeline
@@ -95,6 +96,13 @@ def root() -> dict:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/generators")
+def generators() -> dict:
+    """Expose installed and optional generator availability for web clients."""
+
+    return {"generators": get_available_generators(get_settings().enable_experimental_generators)}
 
 
 @app.get("/samples")

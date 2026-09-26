@@ -7,9 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.generators.bootstrap_generator import BootstrapGenerator
-from app.generators.copula_generator import GaussianCopulaGenerator
-from app.generators.ctgan_generator import CTGANGenerator
-from app.generators.tvae_generator import TVAEGenerator
+from app.generators.registry import create_generator, get_available_generators
 from app.schemas.schemas import GenerationPlan
 from app.utils.exceptions import GeneratorError
 from app.utils.logging_config import get_logger
@@ -25,13 +23,12 @@ MINORITY_MODES = {
 
 class GeneratorAgent:
     def __init__(self) -> None:
+        # Retained as an injection seam for tests and local integrations.
         self._registry = {
-            "ctgan": CTGANGenerator(),
-            "tvae": TVAEGenerator(),
-            "gaussian_copula": GaussianCopulaGenerator(),
-            "bootstrap": BootstrapGenerator(),
+            name: create_generator(name)
+            for name, status in get_available_generators().items()
+            if status["available"]
         }
-
         self._fallback = BootstrapGenerator()
 
     def generate(
@@ -57,12 +54,7 @@ class GeneratorAgent:
                 "Need at least 10 rows to fit a synthetic-data generator."
             )
 
-        generator = self._registry.get(plan.generator)
-
-        if generator is None:
-            raise GeneratorError(
-                f"Unknown generator '{plan.generator}'."
-            )
+        generator = self._registry.get(plan.generator) or create_generator(plan.generator)
 
         # IMPORTANT:
         # Always train on the full real training dataframe.

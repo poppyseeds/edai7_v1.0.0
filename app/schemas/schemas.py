@@ -213,6 +213,7 @@ class PipelineResult(BaseModel):
     optimization_history: list[OptimizationDecision] = Field(default_factory=list)
     agent_logs: list[AgentLog] = Field(default_factory=list)
     llm_summaries: dict[str, str] = Field(default_factory=dict)
+    final_report: str = ""
     fairness: FairnessResult | None = None
     provenance: ProvenanceFingerprint | None = None
     final_evaluation: dict[str, Any] = Field(default_factory=dict)

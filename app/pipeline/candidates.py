@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 from app.config import get_settings
+from app.generators.registry import get_available_generators
 from app.schemas.schemas import GenerationPlan
 
 
@@ -55,7 +56,9 @@ def propose_candidates(plan: GenerationPlan) -> list[GeneratorCandidate]:
     settings = get_settings()
     if not settings.enable_candidate_search:
         return [GeneratorCandidate("candidate-1", plan.generator, plan.num_samples, _plan_hyperparameters(plan))]
+    availability = get_available_generators(settings.enable_experimental_generators)
     order = [plan.generator] + [name for name in GENERATOR_ORDER if name != plan.generator]
+    order = [name for name in order if availability.get(name, {}).get("available")]
     candidates: list[GeneratorCandidate] = []
     maximum = max(1, settings.max_generator_candidates)
     max_samples = plan.max_allowed_samples or plan.num_samples

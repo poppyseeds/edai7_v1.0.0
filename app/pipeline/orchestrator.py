@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.evaluation.fairness import group_performance
 from app.evaluation.unsupervised_utility import evaluate_unsupervised_utility
 from app.evaluation.watermark import provenance_fingerprint
+from app.pipeline.reporting import build_final_report_payload, deterministic_final_report
 from app.models.benchmark_model import DownstreamModel
 from app.schemas.schemas import (
     AgentLog,
@@ -514,6 +515,13 @@ def run_pipeline(
         improved=improved,
         final_dataset_path=best_path,
         best_iteration=best_iter,
+    )
+    report_payload = build_final_report_payload(result)
+    fallback_report = deterministic_final_report(report_payload)
+    result.final_report = (
+        reasoner.explain_final_report(report_payload, fallback_report)
+        if reasoner
+        else fallback_report
     )
     (output_dir / f"{run_id}_result.json").write_text(
         result.model_dump_json(indent=2), encoding="utf-8"
