@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     max_iterations: int = 3
     default_synthetic_ratio: float = 0.3
-    minority_target_ratio: float = 0.50
+    minority_target_ratio: float = 0.20
     moderate_imbalance_target_ratio: float = 0.40
     small_dataset_threshold: int = 1000
     small_dataset_augmentation_ratio: float = 0.50

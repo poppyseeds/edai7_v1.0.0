@@ -201,22 +201,27 @@ def run_pipeline(
 
     for i in range(1, max_iterations + 1):
         max_total_synthetic = int(analysis.rows * settings.max_total_synthetic_ratio)
+        max_per_iteration = max(
+            1, int(analysis.rows * settings.max_generation_ratio_per_iteration)
+        )
         remaining_total = max_total_synthetic - cumulative_synthetic_rows
         if remaining_total <= 0:
             log("Optimizer", "Maximum total synthetic row budget reached")
             break
-        if plan.num_samples > remaining_total:
+        allowed_samples = min(max_per_iteration, remaining_total)
+        if plan.num_samples > allowed_samples:
             log(
                 "SamplePlanner",
-                f"Capping iteration request from {plan.num_samples} to {remaining_total} "
-                "due to total synthetic row budget.",
+                f"Capping iteration request from {plan.num_samples} to {allowed_samples} "
+                "due to per-iteration or total synthetic-row budget.",
             )
             plan = plan.model_copy(
                 update={
-                    "num_samples": remaining_total,
-                    "samples_to_generate": remaining_total,
+                    "num_samples": allowed_samples,
+                    "samples_to_generate": allowed_samples,
                     "sample_count_details": {
                         **plan.sample_count_details,
+                        "per_iteration_cap_applied": plan.num_samples > max_per_iteration,
                         "total_budget_cap_applied": True,
                     },
                 }
@@ -261,6 +266,15 @@ def run_pipeline(
             log(
                 "Benchmark",
                 f"Augmented {bench.augmented.primary_metric}: {bench.augmented.primary_value:.4f}",
+            )
+            delta = bench.improvement.get("primary_value")
+            delta_text = f"{delta:+.4f}" if delta is not None else "n/a"
+            log(
+                "Optimizer",
+                f"Iteration {i}: Generator={plan.generator}; Synthetic rows={len(synthetic)}; "
+                f"Baseline {bench.baseline.primary_metric}={bench.baseline.primary_value:.4f}; "
+                f"Augmented {bench.augmented.primary_metric}={bench.augmented.primary_value:.4f}; "
+                f"Delta={delta_text}",
             )
             iter_score = bench.augmented.primary_value
             if reasoner:
@@ -334,11 +348,19 @@ def run_pipeline(
             break
 
         log("Optimizer", decision.reason)
+        log(
+            "Optimizer",
+            f"Decision=RETRY; Next candidate={decision.next_generator} + {decision.num_samples}",
+        )
         epochs = decision.epochs
         if decision.next_generator == "ctgan":
             epochs = epochs or ctgan_epochs
         elif decision.next_generator == "tvae":
             epochs = epochs or tvae_epochs
+        candidate_history = list(plan.sample_count_details.get("candidate_history", []))
+        candidate_history.append(
+            {"generator": plan.generator, "num_samples": plan.num_samples}
+        )
         plan = GenerationPlan(
             generator=decision.next_generator,  # type: ignore[arg-type]
             num_samples=decision.num_samples or plan.num_samples,
@@ -361,6 +383,7 @@ def run_pipeline(
                 **plan.sample_count_details,
                 "adjusted_by_optimizer": True,
                 "previous_iteration": i,
+                "candidate_history": candidate_history,
             },
             epochs=epochs,
             random_state=random_state,

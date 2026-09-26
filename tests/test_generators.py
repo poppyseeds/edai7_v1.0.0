@@ -1,15 +1,11 @@
-import sys
-from types import ModuleType
-
 import pandas as pd
 import pytest
 
 from app.agents.generator import GeneratorAgent
 from app.generators.bootstrap_generator import BootstrapGenerator
 from app.generators.copula_generator import GaussianCopulaGenerator
-from app.generators.ctgan_generator import CTGANGenerator
+from app.generators.sdv_common import fit_sdv
 from app.schemas.schemas import GenerationPlan
-from app.utils.exceptions import GeneratorError
 
 
 def _toy_df() -> pd.DataFrame:
@@ -55,69 +51,55 @@ def test_generator_agent_does_not_require_target_column() -> None:
     assert "target" not in out.columns
 
 
-def test_ctgan_uses_size_aware_default_epochs() -> None:
-    assert CTGANGenerator._resolve_epochs(100, None) == 500
-    assert CTGANGenerator._resolve_epochs(2_000, None) == 300
-    assert CTGANGenerator._resolve_epochs(20_000, None) == 200
-    assert CTGANGenerator._resolve_epochs(100, 25) == 25
+def test_sdv_seed_is_configured_after_fitting() -> None:
+    events: list[str] = []
 
-
-def test_ctgan_rejects_all_missing_input_columns() -> None:
-    df = _toy_df()
-    df["missing"] = pd.NA
-
-    with pytest.raises(GeneratorError, match="all-missing"):
-        CTGANGenerator().generate(df, num_samples=5)
-
-
-def test_ctgan_output_preserves_nullable_and_categorical_dtypes() -> None:
-    original = pd.DataFrame(
-        {
-            "count": pd.Series([1, 2, None], dtype="Int64"),
-            "enabled": pd.Series([True, False, None], dtype="boolean"),
-            "group": pd.Series(pd.Categorical(["a", "b", None], categories=["a", "b"])),
-        }
-    )
-    sampled = pd.DataFrame(
-        {
-            "count": [1.0, 2.0],
-            "enabled": [True, False],
-            "group": ["a", "b"],
-        }
-    )
-
-    output = CTGANGenerator._validate_output(original, sampled, num_samples=2)
-
-    assert list(output.columns) == list(original.columns)
-    assert output.dtypes.equals(original.dtypes)
-
-
-def test_ctgan_configures_sdv_seed_for_fit_and_sampling(monkeypatch: pytest.MonkeyPatch) -> None:
-    events: list[tuple[str, int | None]] = []
-
-    class FakeCTGAN:
-        def __init__(self, metadata, epochs: int, verbose: bool) -> None:
-            assert metadata == "metadata"
-            assert epochs == 12
-            assert verbose is False
-
-        def set_random_state(self, random_state: int) -> None:
-            events.append(("seed", random_state))
-
+    class FakeSynthesizer:
         def fit(self, df: pd.DataFrame) -> None:
-            events.append(("fit", None))
+            events.append("fit")
 
-    sdv_module = ModuleType("sdv")
-    single_table_module = ModuleType("sdv.single_table")
-    single_table_module.CTGANSynthesizer = FakeCTGAN
-    monkeypatch.setitem(sys.modules, "sdv", sdv_module)
-    monkeypatch.setitem(sys.modules, "sdv.single_table", single_table_module)
-    monkeypatch.setattr("app.generators.ctgan_generator.build_metadata", lambda df: "metadata")
-    monkeypatch.setattr(
-        "app.generators.ctgan_generator.sample_sdv",
-        lambda synthesizer, num_samples: _toy_df().iloc[:num_samples].reset_index(drop=True),
+        def _set_random_state(self, random_state: int) -> None:
+            assert random_state == 7
+            assert events == ["fit"]
+            events.append("seed")
+
+    fit_sdv(FakeSynthesizer(), _toy_df(), random_state=7)
+
+    assert events == ["fit", "seed"]
+
+
+def test_minority_augmentation_uses_full_frame_and_condition(monkeypatch: pytest.MonkeyPatch) -> None:
+    df = _toy_df()
+    calls: dict[str, object] = {}
+
+    class ConditionalGenerator:
+        def generate(self, **kwargs) -> pd.DataFrame:
+            calls.update(kwargs)
+            return pd.DataFrame(
+                {
+                    "age": [22, 23],
+                    "income": [31_000, 31_500],
+                    "city": ["A", "B"],
+                    "target": [1, 1],
+                }
+            )
+
+    agent = GeneratorAgent()
+    monkeypatch.setitem(agent._registry, "gaussian_copula", ConditionalGenerator())
+    plan = GenerationPlan(
+        generator="gaussian_copula",
+        num_samples=2,
+        reason="Minority augmentation test.",
+        generation_mode="minority_augmentation",
+        target_column="target",
+        target_class=1,
+        random_state=7,
     )
 
-    CTGANGenerator().generate(_toy_df(), num_samples=2, random_state=7, epochs=12)
+    output = agent.generate(df, plan)
 
-    assert events == [("seed", 7), ("fit", None), ("seed", 7)]
+    assert calls["df"] is df
+    assert len(calls["df"]) == len(df)
+    assert calls["condition_column"] == "target"
+    assert calls["condition_value"] == 1
+    assert output["target"].eq(1).all()

@@ -38,6 +38,9 @@ def test_pipeline_runs_and_respects_max_iterations(tmp_path) -> None:
     }
     assert output.synthetic_df is not None
     assert list(output.synthetic_df.columns) == list(df.columns)
+    assert result.improved is False
+    assert sum(record.samples_generated for record in result.iterations) <= int(len(df) * 1.5)
+    assert all(record.samples_generated <= int(len(df) * 0.5) for record in result.iterations)
 
 
 def test_unlabeled_pipeline_runs_without_target(tmp_path) -> None:

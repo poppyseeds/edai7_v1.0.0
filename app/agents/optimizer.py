@@ -1,4 +1,4 @@
-"""Choose the next generator if augmentation did not improve utility."""
+"""Choose the next bounded generator and sample-count candidate."""
 
 from __future__ import annotations
 
@@ -15,24 +15,71 @@ from app.utils.logging_config import get_logger
 logger = get_logger("Optimizer")
 
 GENERATOR_CYCLE = ("ctgan", "tvae", "gaussian_copula")
+SAMPLE_COUNT_FACTORS = (0.50, 0.75, 1.00, 1.25)
 
 
 class OptimizationAgent:
-    def _next_sample_count(
+    @staticmethod
+    def _cap_sample_count(requested: int, original_rows: int) -> int:
+        settings = get_settings()
+        maximum = max(1, int(original_rows * settings.max_generation_ratio_per_iteration))
+        return min(max(1, requested), maximum)
+
+    def _initial_sample_count(self, current_plan: GenerationPlan) -> int:
+        configured = current_plan.sample_count_details.get("initial_sample_count")
+        if isinstance(configured, int) and configured > 0:
+            return configured
+        return current_plan.samples_to_generate or current_plan.num_samples
+
+    def _candidate_history(self, current_plan: GenerationPlan) -> list[tuple[str, int]]:
+        raw_history = current_plan.sample_count_details.get("candidate_history", [])
+        history: list[tuple[str, int]] = []
+        if isinstance(raw_history, list):
+            for item in raw_history:
+                if isinstance(item, dict):
+                    generator = item.get("generator")
+                    samples = item.get("num_samples")
+                    if isinstance(generator, str) and isinstance(samples, int):
+                        history.append((generator, samples))
+        current = (current_plan.generator, current_plan.num_samples)
+        if current not in history:
+            history.append(current)
+        return history
+
+    def _next_candidate(
         self,
         current_plan: GenerationPlan,
-        original_rows: int,
-        improved_signal: bool,
-    ) -> int:
-        settings = get_settings()
-        factor = (
-            settings.sample_count_decrease_factor
-            if improved_signal
-            else settings.sample_count_increase_factor
-        )
-        requested = max(1, int(current_plan.num_samples * factor))
-        max_allowed = max(1, int(original_rows * settings.max_generation_ratio_per_iteration))
-        return min(requested, max_allowed)
+        tried_generators: list[str],
+    ) -> tuple[str, int] | None:
+        original_rows = current_plan.original_rows or current_plan.num_samples
+        initial = self._initial_sample_count(current_plan)
+        history = self._candidate_history(current_plan)
+        tried_pairs = set(history)
+        current_attempts = [samples for generator, samples in history if generator == current_plan.generator]
+
+        if len(current_attempts) == 1:
+            for factor in SAMPLE_COUNT_FACTORS:
+                samples = self._cap_sample_count(int(round(initial * factor)), original_rows)
+                if samples != current_plan.num_samples and (current_plan.generator, samples) not in tried_pairs:
+                    return current_plan.generator, samples
+
+        attempted_generators = {generator for generator, _ in history} | set(tried_generators)
+        for generator in GENERATOR_CYCLE:
+            if generator not in attempted_generators:
+                return generator, self._cap_sample_count(initial, original_rows)
+
+        for factor in SAMPLE_COUNT_FACTORS:
+            samples = self._cap_sample_count(int(round(initial * factor)), original_rows)
+            candidate = (current_plan.generator, samples)
+            if candidate not in tried_pairs:
+                return candidate
+        return None
+
+    @staticmethod
+    def _next_epochs(current_plan: GenerationPlan, next_generator: str) -> int | None:
+        if next_generator in {"ctgan", "tvae"}:
+            return max(current_plan.epochs or 10, 15)
+        return current_plan.epochs
 
     def decide(
         self,
@@ -44,7 +91,6 @@ class OptimizationAgent:
         tried_generators: list[str],
     ) -> OptimizationDecision:
         if benchmark is not None and benchmark.improved:
-            logger.info("Improvement detected")
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
@@ -52,9 +98,7 @@ class OptimizationAgent:
                 iteration=iteration,
                 accept=True,
             )
-
         if iteration >= max_iterations:
-            logger.info("Maximum iterations reached")
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
@@ -63,44 +107,30 @@ class OptimizationAgent:
                 accept=False,
             )
 
-        remaining = [g for g in GENERATOR_CYCLE if g not in tried_generators]
-        if current_plan.generator in remaining:
-            remaining = [g for g in remaining if g != current_plan.generator]
-        if not remaining:
-            logger.info("No unused generators remain")
+        candidate = self._next_candidate(current_plan, tried_generators)
+        if candidate is None:
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
-                reason="All generator families have been attempted.",
+                reason="Exhausted the bounded generator and sample-count search.",
                 iteration=iteration,
                 accept=False,
             )
 
-        nxt = remaining[0]
-        primary_delta = None
-        if benchmark is not None:
-            primary_delta = benchmark.improvement.get("primary_value")
-        worsened = primary_delta is not None and primary_delta < 0
-        next_samples = self._next_sample_count(
-            current_plan,
-            original_rows=current_plan.original_rows or current_plan.num_samples,
-            improved_signal=worsened,
-        )
-        next_epochs = current_plan.epochs
-        if nxt in {"ctgan", "tvae"}:
-            next_epochs = max(current_plan.epochs or 10, 15)
-
+        next_generator, next_samples = candidate
+        delta = benchmark.improvement.get("primary_value") if benchmark else None
+        delta_text = f", delta={delta:+.4f}" if delta is not None else ""
         reason = (
-            f"{current_plan.generator} did not improve downstream utility "
-            f"(validation overall={validation.overall_score:.3f}). "
-            f"Trying {nxt} with {next_samples} samples."
+            f"{current_plan.generator} with {current_plan.num_samples} samples did not improve "
+            f"downstream utility (validation={validation.overall_score:.3f}{delta_text}). "
+            f"Next candidate: {next_generator} + {next_samples}."
         )
-        logger.info("Selecting next generator: %s", nxt)
+        logger.info(reason)
         return OptimizationDecision(
             continue_loop=True,
-            next_generator=nxt,
+            next_generator=next_generator,
             num_samples=next_samples,
-            epochs=next_epochs,
+            epochs=self._next_epochs(current_plan, next_generator),
             reason=reason,
             iteration=iteration,
             accept=False,
@@ -116,20 +146,14 @@ class OptimizationAgent:
         tried_generators: list[str],
     ) -> OptimizationDecision:
         if validation.passed and utility.passed:
-            logger.info("Synthetic-data quality improved")
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
-                reason=(
-                    "Synthetic-data quality and unsupervised/statistical utility "
-                    "passed configured thresholds."
-                ),
+                reason="Synthetic-data quality and unsupervised/statistical utility passed configured thresholds.",
                 iteration=iteration,
                 accept=True,
             )
-
         if iteration >= max_iterations:
-            logger.info("Maximum iterations reached")
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
@@ -138,39 +162,29 @@ class OptimizationAgent:
                 accept=False,
             )
 
-        remaining = [g for g in GENERATOR_CYCLE if g not in tried_generators]
-        if not remaining:
-            logger.info("No unused generators remain")
+        candidate = self._next_candidate(current_plan, tried_generators)
+        if candidate is None:
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
-                reason="All generator families have been attempted.",
+                reason="Exhausted the bounded generator and sample-count search.",
                 iteration=iteration,
                 accept=False,
             )
 
-        nxt = remaining[0]
-        worsened = utility.overall_score < validation.overall_score
-        next_samples = self._next_sample_count(
-            current_plan,
-            original_rows=current_plan.original_rows or current_plan.num_samples,
-            improved_signal=worsened,
-        )
-        next_epochs = current_plan.epochs
-        if nxt in {"ctgan", "tvae"}:
-            next_epochs = max(current_plan.epochs or 10, 15)
-
+        next_generator, next_samples = candidate
         reason = (
-            f"{current_plan.generator} did not pass unlabeled quality thresholds "
-            f"(validation={validation.overall_score:.3f}, utility={utility.overall_score:.3f}). "
-            f"Trying {nxt} with {next_samples} samples."
+            f"{current_plan.generator} with {current_plan.num_samples} samples did not pass "
+            f"unlabeled thresholds (validation={validation.overall_score:.3f}, "
+            f"utility={utility.overall_score:.3f}). Next candidate: "
+            f"{next_generator} + {next_samples}."
         )
-        logger.info("Selecting next unlabeled generator: %s", nxt)
+        logger.info(reason)
         return OptimizationDecision(
             continue_loop=True,
-            next_generator=nxt,
+            next_generator=next_generator,
             num_samples=next_samples,
-            epochs=next_epochs,
+            epochs=self._next_epochs(current_plan, next_generator),
             reason=reason,
             iteration=iteration,
             accept=False,

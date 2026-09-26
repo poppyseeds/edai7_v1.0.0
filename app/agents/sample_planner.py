@@ -76,7 +76,8 @@ class SamplePlanner:
         logger.info("Minority class: %s (%s rows)", minority_label, minority_count)
 
         if target_ratio is not None:
-            desired = int(math.ceil(majority_count * target_ratio))
+            current_ratio = minority_count / max(rows, 1)
+            desired = max(minority_count, int(math.ceil(rows * target_ratio)))
             calculated = max(0, desired - minority_count)
             logger.info("Target minority count: %s", desired)
             logger.info("Required synthetic rows: %s", calculated)
@@ -88,7 +89,7 @@ class SamplePlanner:
                 samples_to_generate=final,
                 reason=(
                     f"Increase minority representation toward {target_ratio:.0%} "
-                    "of the majority-class count."
+                    "of the original dataset population."
                 ),
                 original_rows=rows,
                 target_class=minority_label,
@@ -97,11 +98,17 @@ class SamplePlanner:
                 augmentation_ratio=final / max(rows, 1),
                 max_allowed_samples=max_allowed,
                 details={
+                    "strategy": "minority_balance",
                     "majority_class": majority_label,
                     "majority_count": majority_count,
-                    "target_ratio": target_ratio,
+                    "current_minority_ratio": current_ratio,
+                    "target_minority_ratio": target_ratio,
+                    "current_minority_count": minority_count,
+                    "desired_minority_count": desired,
+                    "synthetic_rows_required": calculated,
                     "calculated_samples": calculated,
                     "capped": capped,
+                    "reason": "Minority augmentation is only required below the conservative initial target.",
                 },
             )
 

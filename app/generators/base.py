@@ -15,5 +15,13 @@ class BaseSyntheticGenerator(ABC):
         num_samples: int,
         random_state: int = 42,
         epochs: int | None = None,
+        condition_column: str | None = None,
+        condition_value: object | None = None,
     ) -> pd.DataFrame:
-        """Train on `df` and return `num_samples` synthetic rows."""
+        """
+        Train on df and return synthetic rows.
+
+        If condition_column and condition_value are provided,
+        the generator should attempt conditional sampling.
+        """
+        raise NotImplementedError

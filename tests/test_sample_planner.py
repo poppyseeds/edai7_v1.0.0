@@ -28,32 +28,38 @@ def _validation(score: float = 0.5) -> ValidationResult:
     )
 
 
-def test_severe_imbalance_plans_half_majority_minority_target() -> None:
-    df = _labeled_counts(9000, 1000)
+def test_severe_imbalance_uses_conservative_minority_population_target() -> None:
+    df = _labeled_counts(450, 50)
     analysis = DatasetAnalyzer().analyze(df, target_column="target")
     decision = SamplePlanner().plan(analysis)
     assert decision.generation_mode == "minority_augmentation"
-    assert decision.current_target_count == 1000
-    assert decision.desired_target_count == 4500
-    assert decision.samples_to_generate == 3500
+    assert decision.current_target_count == 50
+    assert decision.desired_target_count == 100
+    assert decision.samples_to_generate == 50
+    assert decision.details["strategy"] == "minority_balance"
+    assert decision.details["target_minority_ratio"] == 0.20
 
 
-def test_moderate_imbalance_does_not_full_balance() -> None:
-    df = _labeled_counts(7000, 3000)
+def test_minority_already_at_target_is_not_forced_to_augment() -> None:
+    df = _labeled_counts(800, 200)
     analysis = DatasetAnalyzer().analyze(df, target_column="target")
     decision = SamplePlanner().plan(analysis)
-    assert decision.generation_mode == "moderate_minority_augmentation"
-    assert decision.desired_target_count == 2800
+    assert decision.generation_mode in {
+        "minority_augmentation",
+        "moderate_minority_augmentation",
+    }
+    assert decision.current_target_count == 200
+    assert decision.desired_target_count == 200
     assert decision.samples_to_generate == 0
 
 
 def test_extreme_imbalance_is_capped(monkeypatch) -> None:
-    monkeypatch.setenv("MINORITY_TARGET_RATIO", "1.0")
+    monkeypatch.setenv("MINORITY_TARGET_RATIO", "0.75")
     df = _labeled_counts(99000, 1000)
     analysis = DatasetAnalyzer().analyze(df, target_column="target")
     decision = SamplePlanner().plan(analysis)
-    assert decision.desired_target_count == 99000
-    assert decision.details["calculated_samples"] == 98000
+    assert decision.desired_target_count == 75000
+    assert decision.details["calculated_samples"] == 74000
     assert decision.samples_to_generate == 50000
     assert decision.details["capped"] is True
 
@@ -95,7 +101,7 @@ def test_healthy_large_dataset_can_skip_generation() -> None:
     assert decision.samples_to_generate == 0
 
 
-def test_optimizer_changes_sample_count_after_poor_attempt() -> None:
+def test_optimizer_retries_same_generator_with_different_sample_count() -> None:
     plan = GenerationPlan(
         generator="ctgan",
         num_samples=2000,
@@ -112,15 +118,54 @@ def test_optimizer_changes_sample_count_after_poor_attempt() -> None:
     )
     assert isinstance(decision, OptimizationDecision)
     assert decision.continue_loop is True
-    assert decision.next_generator != "ctgan"
+    assert decision.next_generator == "ctgan"
     assert decision.num_samples != 2000
+
+
+def test_optimizer_switches_generator_after_same_family_retry() -> None:
+    plan = GenerationPlan(
+        generator="ctgan",
+        num_samples=25,
+        reason="test",
+        original_rows=500,
+        target_column="target",
+        target_class=1,
+        generation_mode="minority_augmentation",
+        sample_count_details={
+            "initial_sample_count": 50,
+            "candidate_history": [
+                {"generator": "ctgan", "num_samples": 50},
+                {"generator": "ctgan", "num_samples": 25},
+            ],
+        },
+    )
+    decision = OptimizationAgent().decide(
+        iteration=2,
+        max_iterations=3,
+        current_plan=plan,
+        benchmark=None,
+        validation=_validation(0.4),
+        tried_generators=["ctgan"],
+    )
+    assert decision.next_generator == "tvae"
+    assert decision.num_samples == 50
+    assert plan.target_column == "target"
+    assert plan.target_class == 1
 
 
 def test_generation_planner_records_sample_count_details() -> None:
     df = _labeled_counts(9000, 1000)
     analysis = DatasetAnalyzer().analyze(df, target_column="target")
     plan = GenerationPlanner().plan(analysis, preferred_generator="gaussian_copula")
-    assert plan.samples_to_generate == 3500
+    assert plan.samples_to_generate == 1000
     assert plan.current_target_count == 1000
-    assert plan.desired_target_count == 4500
+    assert plan.desired_target_count == 2000
     assert plan.generation_mode == "minority_augmentation"
+
+
+def test_generation_planner_applies_synthetic_ratio_to_non_minority_expansion() -> None:
+    df = pd.DataFrame({"feature": range(200), "other": range(200)})
+    analysis = DatasetAnalyzer().analyze(df)
+    plan = GenerationPlanner().plan(analysis, synthetic_ratio=0.30)
+    assert plan.num_samples == 60
+    assert plan.sample_count_details["synthetic_ratio_applied"] is True

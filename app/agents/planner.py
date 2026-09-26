@@ -27,6 +27,25 @@ class GenerationPlanner:
 
         issues = set(analysis.issues)
         sample_decision = SamplePlanner().plan(analysis)
+        if (
+            synthetic_ratio is not None
+            and sample_decision.generation_needed
+            and sample_decision.generation_mode
+            not in {"minority_augmentation", "moderate_minority_augmentation"}
+        ):
+            requested = max(0, int(round(analysis.rows * synthetic_ratio)))
+            final, max_allowed, capped = SamplePlanner().cap_samples(requested, analysis.rows)
+            sample_decision.samples_to_generate = final
+            sample_decision.augmentation_ratio = final / max(analysis.rows, 1)
+            sample_decision.max_allowed_samples = max_allowed
+            sample_decision.generation_needed = final > 0
+            sample_decision.details = {
+                **sample_decision.details,
+                "synthetic_ratio": synthetic_ratio,
+                "synthetic_ratio_requested_rows": requested,
+                "synthetic_ratio_applied": True,
+                "capped": capped,
+            }
         num_samples = sample_decision.samples_to_generate
         strategy = sample_decision.generation_mode
         generator = "gaussian_copula"
@@ -83,7 +102,10 @@ class GenerationPlanner:
             augmentation_ratio=sample_decision.augmentation_ratio,
             max_allowed_samples=sample_decision.max_allowed_samples,
             sample_count_reason=sample_decision.reason,
-            sample_count_details=sample_decision.details,
+            sample_count_details={
+                **sample_decision.details,
+                "initial_sample_count": num_samples,
+            },
             epochs=epochs,
             random_state=seed,
             preserve_columns=list(analysis.column_names),
