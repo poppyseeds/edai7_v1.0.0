@@ -68,11 +68,13 @@ class ValidationResult(BaseModel):
 
 
 class UnsupervisedUtilityResult(BaseModel):
-    label: str = "Unsupervised / Statistical Utility"
+    label: str = "Unlabeled data similarity benchmark"
     distribution_score: float
     correlation_score: float
     diversity_score: float
     structural_score: float
+    knn_similarity_score: float | None = None
+    knn_discriminator_auc: float | None = None
     overall_score: float
     passed: bool
     details: dict[str, Any] = Field(default_factory=dict)
@@ -102,6 +104,10 @@ class BenchmarkResult(BaseModel):
     improvement: dict[str, float | None]
     improved: bool
     split_seed: int
+    relative_improvement: float = 0.0
+    absolute_improvement: float = 0.0
+    min_relative_improvement: float = 0.02
+    min_absolute_improvement: float = 0.01
     notes: str = ""
 
 
@@ -176,12 +182,13 @@ class PipelineResult(BaseModel):
 
 
 class PipelineConfigModel(BaseModel):
-    max_iterations: int = 3
+    max_iterations: int = 5
     random_state: int = 42
     synthetic_ratio: float = 0.3
     ctgan_epochs: int | None = None
     tvae_epochs: int = 10
-    min_improvement: float = 0.005
+    min_improvement: float = 0.02
+    min_absolute_improvement: float = 0.01
     test_size: float = 0.25
     enable_llm: bool = True
     auto_detect_target: bool = False

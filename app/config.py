@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
-    max_iterations: int = 3
+    max_iterations: int = 5
     default_synthetic_ratio: float = 0.3
     minority_target_ratio: float = 0.20
     moderate_imbalance_target_ratio: float = 0.40
@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     max_upload_mb: int = 20
     min_rows: int = 20
     test_size: float = 0.25
-    min_improvement: float = 0.005
+    # A candidate must clear both thresholds before the pipeline claims a gain.
+    min_improvement: float = 0.02
+    min_absolute_improvement: float = 0.01
     validation_pass_threshold: float = 0.55
     log_level: str = "INFO"
     generated_dir: str = "generated"

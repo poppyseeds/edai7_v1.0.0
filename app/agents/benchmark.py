@@ -78,10 +78,16 @@ class BenchmarkAgent:
         task_type: str,
         random_state: int = 42,
         min_improvement: float | None = None,
+        min_absolute_improvement: float | None = None,
     ) -> BenchmarkResult:
         settings = get_settings()
         min_improvement = (
             settings.min_improvement if min_improvement is None else min_improvement
+        )
+        min_absolute_improvement = (
+            settings.min_absolute_improvement
+            if min_absolute_improvement is None
+            else min_absolute_improvement
         )
         baseline = self.evaluate_split(
             train, test, target_column, task_type, random_state=random_state
@@ -125,10 +131,14 @@ class BenchmarkAgent:
                 improvement[key] = float(a - b)
 
         rel = primary_improvement(baseline, augmented)
-        improved = rel >= min_improvement
+        absolute = improvement.get("primary_value")
+        absolute = float(absolute) if absolute is not None else 0.0
+        improved = rel >= min_improvement and absolute >= min_absolute_improvement
         note = (
-            f"Relative change in {baseline.primary_metric}: {rel:.4f}. "
-            "Test split is held out from original data only."
+            f"Relative change in {baseline.primary_metric}: {rel:.4f}; "
+            f"absolute change: {absolute:+.4f}. Acceptance requires at least "
+            f"{min_improvement:.1%} relative and +{min_absolute_improvement:.4f} absolute improvement. "
+            "The test split contains held-out original rows only."
         )
         return BenchmarkResult(
             baseline=baseline,
@@ -136,5 +146,9 @@ class BenchmarkAgent:
             improvement=improvement,
             improved=improved,
             split_seed=random_state,
+            relative_improvement=rel,
+            absolute_improvement=absolute,
+            min_relative_improvement=min_improvement,
+            min_absolute_improvement=min_absolute_improvement,
             notes=note,
         )

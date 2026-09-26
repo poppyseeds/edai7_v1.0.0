@@ -3,6 +3,7 @@ from sklearn.datasets import make_classification
 
 from app.evaluation.diversity import diversity_score
 from app.evaluation.fidelity import fidelity_score
+from app.evaluation.unsupervised_utility import evaluate_unsupervised_utility
 from app.models.benchmark_model import DownstreamModel
 
 
@@ -36,3 +37,19 @@ def test_benchmark_metrics_classification() -> None:
     metrics = model.evaluate(df.iloc[60:], y.iloc[60:], n_train=60)
     assert metrics.f1 is not None
     assert 0 <= metrics.accuracy <= 1
+
+
+def test_unlabeled_utility_includes_knn_similarity_benchmark() -> None:
+    original = pd.DataFrame(
+        {
+            "age": list(range(20, 40)),
+            "spend": [100 + index * 5 for index in range(20)],
+            "segment": ["A" if index % 2 else "B" for index in range(20)],
+        }
+    )
+    utility = evaluate_unsupervised_utility(original, original.copy(), random_state=0)
+
+    assert utility.knn_similarity_score is not None
+    assert utility.knn_discriminator_auc is not None
+    assert 0 <= utility.knn_similarity_score <= 1
+    assert 0 <= utility.knn_discriminator_auc <= 1

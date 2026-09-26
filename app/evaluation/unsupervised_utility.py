@@ -1,8 +1,8 @@
 """Unsupervised/statistical utility for datasets without a target column.
 
-This is not a supervised ML utility benchmark. It summarizes whether synthetic
-data preserves broad distribution, correlation, diversity, and numerical
-structure from the original table.
+There is no target column in this mode, so accuracy and F1 would be misleading.
+Instead, this evaluates whether a K-nearest-neighbors (KNN) classifier can tell
+original and synthetic rows apart, alongside distribution and structure checks.
 """
 
 from __future__ import annotations
@@ -10,7 +10,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 
 from app.config import get_settings
 from app.evaluation.diversity import diversity_score
@@ -19,34 +26,46 @@ from app.schemas.schemas import UnsupervisedUtilityResult
 from app.utils.data_utils import infer_column_types
 
 METRIC_NOTES = {
-    "distribution_score": "Existing distribution similarity metric across numerical and categorical columns.",
-    "correlation_score": "Existing numerical correlation preservation score.",
-    "diversity_score": "Existing unique-row, category coverage, and numerical range coverage score.",
-    "structural_score": "PCA explained-variance similarity for numerical columns when at least two numerical columns exist.",
-    "overall_score": "Mean of distribution, correlation, diversity, and structural scores.",
+    "distribution_score": "How closely individual column values match (distribution similarity). Higher is better.",
+    "correlation_score": "How closely relationships between number columns match (correlation preservation). Higher is better.",
+    "diversity_score": "Whether the generated table has enough varied rows and categories. Higher is better.",
+    "structural_score": "Whether broad numerical patterns match, measured with PCA (a way to summarize data shape). Higher is better.",
+    "knn_similarity_score": "KNN similarity: a K-nearest-neighbors classifier tries to separate original from synthetic rows. Higher means it could not easily tell them apart.",
+    "knn_discriminator_auc": "KNN discriminator AUC: 0.50 means the classifier is guessing; values closer to 1.00 mean it can tell the two datasets apart.",
+    "overall_score": "Average of the available unlabeled similarity checks. This is a data-quality comparison, not prediction accuracy.",
 }
 
 
 def evaluate_unsupervised_utility(
     original: pd.DataFrame,
     synthetic: pd.DataFrame,
+    random_state: int | None = None,
 ) -> UnsupervisedUtilityResult:
     dist = distribution_score(original, synthetic)
     corr = correlation_score(original, synthetic)
     div, div_details = diversity_score(original, synthetic)
     structural, structural_details = _pca_structure_score(original, synthetic)
-    overall = float(np.mean([dist, corr, div, structural]))
+    knn_similarity, knn_auc, knn_details = _knn_similarity_score(
+        original, synthetic, random_state=random_state
+    )
+    scores = [dist, corr, div, structural]
+    if knn_similarity is not None:
+        scores.append(knn_similarity)
+    overall = float(np.mean(scores))
     threshold = get_settings().validation_pass_threshold
     return UnsupervisedUtilityResult(
         distribution_score=round(float(dist), 4),
         correlation_score=round(float(corr), 4),
         diversity_score=round(float(div), 4),
         structural_score=round(float(structural), 4),
+        knn_similarity_score=(round(knn_similarity, 4) if knn_similarity is not None else None),
+        knn_discriminator_auc=(round(knn_auc, 4) if knn_auc is not None else None),
         overall_score=round(overall, 4),
         passed=overall >= threshold,
         details={
             "diversity": div_details,
             "structural": structural_details,
+            "knn": knn_details,
         },
         metric_notes=METRIC_NOTES,
     )
@@ -79,4 +98,83 @@ def _pca_structure_score(
         "status": "computed",
         "components": float(n_components),
         "mean_explained_variance_difference": mean_diff,
+    }
+
+
+def _knn_similarity_score(
+    original: pd.DataFrame,
+    synthetic: pd.DataFrame,
+    random_state: int | None,
+) -> tuple[float | None, float | None, dict[str, float | int | str]]:
+    """Measure whether KNN can distinguish an original row from a synthetic one."""
+
+    columns = [column for column in original.columns if column in synthetic.columns]
+    sample_size = min(len(original), len(synthetic))
+    if sample_size < 4 or not columns:
+        return None, None, {
+            "status": "not_applicable",
+            "reason": "At least four rows from both datasets and one shared column are required.",
+        }
+
+    seed = get_settings().random_state if random_state is None else random_state
+    original_sample = original[columns].sample(n=sample_size, random_state=seed).copy()
+    synthetic_sample = synthetic[columns].sample(n=sample_size, random_state=seed).copy()
+    combined = pd.concat([original_sample, synthetic_sample], ignore_index=True)
+    labels = np.array([0] * sample_size + [1] * sample_size)
+    numerical, categorical = infer_column_types(original_sample)
+    transformers = []
+    if numerical:
+        transformers.append(
+            (
+                "numeric",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="median")),
+                        ("scaler", StandardScaler()),
+                    ]
+                ),
+                numerical,
+            )
+        )
+    if categorical:
+        transformers.append(
+            (
+                "categorical",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="most_frequent")),
+                        ("onehot", OneHotEncoder(handle_unknown="ignore")),
+                    ]
+                ),
+                categorical,
+            )
+        )
+    if not transformers:
+        return None, None, {"status": "not_applicable", "reason": "No usable shared columns."}
+
+    try:
+        train_x, test_x, train_y, test_y = train_test_split(
+            combined,
+            labels,
+            test_size=0.5,
+            random_state=seed,
+            stratify=labels,
+        )
+        model = Pipeline(
+            [
+                ("preprocess", ColumnTransformer(transformers=transformers)),
+                ("knn", KNeighborsClassifier(n_neighbors=min(5, len(train_x)))),
+            ]
+        )
+        model.fit(train_x, train_y)
+        auc = float(roc_auc_score(test_y, model.predict_proba(test_x)[:, 1]))
+    except Exception as exc:
+        return None, None, {"status": "not_applicable", "reason": str(exc)}
+
+    similarity = float(np.clip(1.0 - (2.0 * abs(auc - 0.5)), 0.0, 1.0))
+    return similarity, auc, {
+        "status": "computed",
+        "sample_size_per_dataset": sample_size,
+        "test_rows": int(len(test_x)),
+        "n_neighbors": min(5, len(train_x)),
     }

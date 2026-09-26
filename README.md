@@ -7,7 +7,7 @@ The platform now supports two modes:
 1. Labeled Mode: a user-selected or conservatively auto-detected target column is available.
 2. Unlabeled Mode: no target column is selected, so the system generates and validates synthetic data without supervised ML metrics.
 
-Synthetic data generation, validation, privacy checks, diversity checks, distribution comparison, and correlation comparison work in both modes. Supervised benchmarking runs only in labeled mode.
+Synthetic data generation, validation, privacy checks, diversity checks, distribution comparison, and correlation comparison work in both modes. Labeled mode uses supervised prediction benchmarking; unlabeled mode uses a KNN similarity benchmark plus statistical checks.
 
 ## Quick Start
 
@@ -37,7 +37,7 @@ cd C:\Users\Ketan\Desktop\edai7_v1.0
 streamlit run frontend/dashboard.py
 ```
 
-Optional Gemini explanations: copy `.env.example` to `.env` and set `GEMINI_API_KEY`. Core statistical and ML metrics never come from the LLM.
+Optional Gemini explanations: copy `.env.example` to `.env` and set a valid `GEMINI_API_KEY`. Gemini explains measured results in plain language; core statistical and ML metrics never come from the LLM.
 
 ## Sample Data
 
@@ -68,9 +68,10 @@ The pipeline:
 5. Trains a baseline model on original training data.
 6. Trains an augmented model on original plus synthetic training data.
 7. Evaluates both on the same held-out original test set.
-8. Optimizes using supervised utility, such as F1 or R2.
+8. Evaluates the configured generator/sample-count search budget, then selects the best candidate.
+9. Marks a candidate as improved only when it passes data-quality checks and clears both the configured relative and absolute utility thresholds.
 
-Classification metrics include accuracy, precision, recall, F1, and ROC-AUC when available. Regression metrics include MAE, RMSE, and R2.
+Classification metrics include accuracy, precision, recall, F1, and ROC-AUC when available. Regression metrics include MAE, RMSE, and R2. By default, a labeled candidate needs at least `2%` relative and `+0.01` absolute primary-metric improvement before the pipeline calls it an improvement. Both models use the same held-out original test rows.
 
 ## Unlabeled Mode
 
@@ -82,16 +83,17 @@ The pipeline:
 2. Plans a general synthetic-data generation strategy.
 3. Generates synthetic rows for the full table.
 4. Validates fidelity, distribution similarity, correlation similarity, diversity, and basic privacy risk.
-5. Computes "Unsupervised / Statistical Utility" using deterministic statistical metrics.
+5. Runs a KNN similarity benchmark: KNN tries to distinguish original from generated rows. An AUC near `0.50` means it is guessing, which is desirable.
+6. Computes overall unlabeled utility from the KNN result and deterministic statistical metrics.
 6. Optimizes using synthetic-data quality and statistical utility.
 
-No F1, accuracy, precision, recall, ROC-AUC, MAE, RMSE, or R2 values are shown for unlabeled data.
+No target-prediction F1, accuracy, precision, recall, MAE, RMSE, or R2 values are shown for unlabeled data. The displayed KNN AUC is a dataset-similarity comparison, not a prediction-quality claim.
 
 ## Adaptive Synthetic Sample Count
 
 The platform does not blindly generate a fixed percentage for every dataset. `SamplePlanner` calculates an initial row count from dataset characteristics, then the optimizer can adjust the count after validation and utility feedback.
 
-Prototype defaults are configurable in `app/config.py` or `.env`:
+Prototype defaults are configurable in `app/config.py` or `.env`. The default five-iteration search has enough room to compare sample counts and all supported generator families; it takes longer than the previous three-iteration prototype run.
 
 - `MINORITY_TARGET_RATIO=0.50`
 - `MODERATE_IMBALANCE_TARGET_RATIO=0.40`
@@ -130,8 +132,8 @@ Every iteration records requested rows, generated rows, cumulative synthetic row
 - `SamplePlanner`: adaptive initial synthetic row-count calculation
 - `GeneratorAgent`: SDV CTGAN, TVAE, GaussianCopula, with bootstrap fallback
 - `ValidationAgent`: fidelity, distribution, correlation, diversity, and basic privacy indicators
-- `BenchmarkAgent`: supervised original vs augmented downstream ML utility for labeled mode only
-- `evaluate_unsupervised_utility`: statistical utility for unlabeled mode
+- `BenchmarkAgent`: supervised original vs augmented downstream ML utility for labeled mode
+- `evaluate_unsupervised_utility`: KNN similarity benchmark and statistical utility for unlabeled mode
 - `OptimizationAgent`: separate labeled and unlabeled optimization decisions
 
 Privacy, fairness, and provenance are prototype-level:

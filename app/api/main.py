@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Thread
+from typing import Any
+from uuid import uuid4
 
+import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from app import __version__
 from app.agents.analyzer import DatasetAnalyzer
@@ -14,11 +19,17 @@ from app.agents.generator import GeneratorAgent
 from app.agents.planner import GenerationPlanner
 from app.config import get_settings
 from app.pipeline.orchestrator import PipelineConfig, run_pipeline
-from app.utils.data_utils import load_csv_bytes, save_csv
+from app.utils.data_utils import (
+    create_sample_churn_dataset,
+    create_unlabeled_customer_dataset,
+    load_csv_bytes,
+    save_csv,
+)
 from app.utils.exceptions import InvalidDatasetError, SyntheticAIError
-from app.utils.logging_config import setup_logging
+from app.utils.logging_config import get_logger, setup_logging
 
 setup_logging(get_settings().log_level)
+logger = get_logger("API")
 
 app = FastAPI(
     title="Synthetic-AI Multi-Agent Platform",
@@ -33,6 +44,8 @@ app.add_middleware(
 )
 
 RUNS: dict[str, dict] = {}
+PIPELINE_JOBS: dict[str, dict] = {}
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _target_options(target_column: str | None) -> tuple[str | None, bool]:
@@ -62,6 +75,13 @@ def _read_upload(file: UploadFile, min_rows: int | None = None):
     return df, file.filename
 
 
+def _preview_records(df, rows: int = 20) -> list[dict[str, Any]]:
+    """Serialize previews safely when uploaded CSVs contain missing values."""
+
+    preview = df.head(rows).astype(object).where(pd.notna(df.head(rows)), None)
+    return jsonable_encoder(preview.to_dict(orient="records"))
+
+
 @app.get("/")
 def root() -> dict:
     return {
@@ -75,6 +95,33 @@ def root() -> dict:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/samples")
+def list_samples() -> dict:
+    return {
+        "samples": [
+            {"id": "labeled", "filename": "labeled_customer.csv", "label": "Labeled customer sample"},
+            {"id": "unlabeled", "filename": "unlabeled_customer.csv", "label": "Unlabeled customer sample"},
+        ]
+    }
+
+
+@app.get("/samples/{sample_id}")
+def download_sample(sample_id: str):
+    sample_paths = {
+        "labeled": PROJECT_ROOT / "datasets" / "sample" / "labeled_customer.csv",
+        "unlabeled": PROJECT_ROOT / "datasets" / "sample" / "unlabeled_customer.csv",
+    }
+    path = sample_paths.get(sample_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Sample dataset not found.")
+    if not path.exists():
+        if sample_id == "labeled":
+            create_sample_churn_dataset(path)
+        else:
+            create_unlabeled_customer_dataset(path)
+    return FileResponse(path, filename=path.name, media_type="text/csv")
 
 
 @app.post("/analyze")
@@ -93,7 +140,11 @@ async def analyze(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return result.model_dump()
+    return {
+        "analysis": result.model_dump(),
+        "filename": file.filename,
+        "preview": _preview_records(df),
+    }
 
 
 @app.post("/generate")
@@ -125,7 +176,38 @@ async def generate(
         "plan": plan.model_dump(),
         "rows": len(synthetic),
         "path": str(out),
-        "preview": synthetic.head(10).to_dict(orient="records"),
+        "preview": _preview_records(synthetic, 10),
+    }
+
+
+@app.post("/plan")
+async def plan_generation(
+    file: UploadFile = File(...),
+    target_column: str | None = Form(None),
+    generator: str | None = Form(None),
+    auto_detect_target: bool = Form(False),
+):
+    """Return the real analyzer and planner output without generating data."""
+
+    df, filename = _read_upload(file)
+    explicit_target, auto = _target_options(target_column)
+    try:
+        analysis = DatasetAnalyzer().analyze(
+            df,
+            target_column=explicit_target,
+            auto_detect_target=auto or auto_detect_target,
+        )
+        plan = GenerationPlanner().plan(analysis, preferred_generator=generator)
+    except (SyntheticAIError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Dataset analysis or planning failed for %s", filename)
+        raise HTTPException(status_code=400, detail=f"Dataset analysis failed: {exc}") from exc
+    return {
+        "filename": filename,
+        "analysis": analysis.model_dump(),
+        "plan": plan.model_dump(),
+        "preview": _preview_records(df),
     }
 
 
@@ -133,7 +215,7 @@ async def generate(
 async def run(
     file: UploadFile = File(...),
     target_column: str | None = Form(None),
-    max_iterations: int = Form(3),
+    max_iterations: int = Form(5),
     sensitive_column: str | None = Form(None),
     preferred_generator: str | None = Form(None),
     enable_llm: bool = Form(True),
@@ -165,8 +247,78 @@ async def run(
     }
     payload = output.result.model_dump()
     if output.synthetic_df is not None:
-        payload["synthetic_preview"] = output.synthetic_df.head(15).to_dict(orient="records")
+        payload["synthetic_preview"] = _preview_records(output.synthetic_df, 15)
     return payload
+
+
+@app.post("/pipeline-runs")
+async def start_pipeline_run(
+    file: UploadFile = File(...),
+    target_column: str | None = Form(None),
+    max_iterations: int = Form(5),
+    sensitive_column: str | None = Form(None),
+    preferred_generator: str | None = Form(None),
+    enable_llm: bool = Form(True),
+    auto_detect_target: bool = Form(False),
+):
+    """Start the existing synchronous pipeline in a background thread for web clients."""
+
+    df, filename = _read_upload(file)
+    explicit_target, auto = _target_options(target_column)
+    job_id = uuid4().hex
+    PIPELINE_JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "filename": filename,
+    }
+
+    def execute() -> None:
+        PIPELINE_JOBS[job_id]["status"] = "running"
+        try:
+            output = run_pipeline(
+                df,
+                target_column=explicit_target,
+                config=PipelineConfig(
+                    max_iterations=max_iterations,
+                    enable_llm=enable_llm,
+                    auto_detect_target=auto or auto_detect_target,
+                    preferred_generator=preferred_generator,
+                    sensitive_column=sensitive_column or None,
+                    dataset_filename=filename,
+                ),
+            )
+            RUNS[output.result.run_id] = {
+                "result": output.result,
+                "synthetic_df": output.synthetic_df,
+                "original_df": output.original_df,
+            }
+            PIPELINE_JOBS[job_id] = {
+                "job_id": job_id,
+                "status": "completed",
+                "filename": filename,
+                "run_id": output.result.run_id,
+                "result": output.result.model_dump(),
+                "synthetic_preview": (
+                    _preview_records(output.synthetic_df)
+                    if output.synthetic_df is not None
+                    else []
+                ),
+            }
+        except (SyntheticAIError, ValueError) as exc:
+            PIPELINE_JOBS[job_id].update({"status": "failed", "error": str(exc)})
+        except Exception as exc:  # pragma: no cover - defensive job boundary
+            PIPELINE_JOBS[job_id].update({"status": "failed", "error": str(exc)})
+
+    Thread(target=execute, daemon=True).start()
+    return PIPELINE_JOBS[job_id]
+
+
+@app.get("/pipeline-runs/{job_id}")
+def get_pipeline_run(job_id: str):
+    job = PIPELINE_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Pipeline run not found.")
+    return job
 
 
 @app.get("/runs/{run_id}")

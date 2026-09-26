@@ -28,7 +28,8 @@ class LLMReasoner:
             prompt = (
                 "You are explaining an autonomous synthetic-data pipeline to a student. "
                 "Use only the JSON facts provided. Do not invent metrics. "
-                "Return 2-4 short sentences.\n"
+                "Return 2-4 short sentences in plain language. When using a technical term, "
+                "immediately explain it in simple words in parentheses.\n"
                 f"Task: {task}\n"
                 f"JSON:\n{json.dumps(payload, default=str)[:8000]}"
             )

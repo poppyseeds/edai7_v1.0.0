@@ -145,13 +145,20 @@ class DatasetAnalyzer:
         for col in numerical:
             s = pd.to_numeric(df[col], errors="coerce")
             stats[col] = {
-                "mean": float(s.mean()) if s.notna().any() else 0.0,
-                "std": float(s.std(ddof=0)) if s.notna().any() else 0.0,
-                "min": float(s.min()) if s.notna().any() else 0.0,
-                "max": float(s.max()) if s.notna().any() else 0.0,
-                "skew": float(s.skew()) if s.notna().sum() > 2 else 0.0,
+                "mean": self._finite(s.mean()) if s.notna().any() else 0.0,
+                "std": self._finite(s.std(ddof=0)) if s.notna().any() else 0.0,
+                "min": self._finite(s.min()) if s.notna().any() else 0.0,
+                "max": self._finite(s.max()) if s.notna().any() else 0.0,
+                "skew": self._finite(s.skew()) if s.notna().sum() > 2 else 0.0,
             }
         return stats
+
+    @staticmethod
+    def _finite(value: object) -> float:
+        """Keep API-facing analysis values valid JSON numbers."""
+
+        numeric = float(value)
+        return numeric if np.isfinite(numeric) else 0.0
 
     def _categorical_distributions(
         self, df: pd.DataFrame, categorical: list[str]
@@ -167,7 +174,7 @@ class DatasetAnalyzer:
     ) -> dict[str, dict[str, float]]:
         if len(numerical) < 2:
             return {}
-        corr = df[numerical].corr(numeric_only=True).fillna(0.0)
+        corr = df[numerical].corr(numeric_only=True).replace([np.inf, -np.inf], 0.0).fillna(0.0)
         return {
             r: {c: float(corr.loc[r, c]) for c in corr.columns}
             for r in corr.index

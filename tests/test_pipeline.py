@@ -65,6 +65,7 @@ def test_unlabeled_pipeline_runs_without_target(tmp_path) -> None:
     assert result.baseline is None
     assert result.iterations[0].benchmark is None
     assert result.iterations[0].unsupervised_utility is not None
+    assert result.iterations[0].unsupervised_utility.knn_similarity_score is not None
     assert output.synthetic_df is not None
     assert list(output.synthetic_df.columns) == list(df.columns)
 

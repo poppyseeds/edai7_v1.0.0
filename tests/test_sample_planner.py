@@ -4,7 +4,13 @@ from app.agents.analyzer import DatasetAnalyzer
 from app.agents.optimizer import OptimizationAgent
 from app.agents.planner import GenerationPlanner
 from app.agents.sample_planner import SamplePlanner
-from app.schemas.schemas import GenerationPlan, OptimizationDecision, ValidationResult
+from app.schemas.schemas import (
+    BenchmarkResult,
+    GenerationPlan,
+    ModelMetrics,
+    OptimizationDecision,
+    ValidationResult,
+)
 
 
 def _labeled_counts(zeros: int, ones: int) -> pd.DataFrame:
@@ -151,6 +157,38 @@ def test_optimizer_switches_generator_after_same_family_retry() -> None:
     assert decision.num_samples == 50
     assert plan.target_column == "target"
     assert plan.target_class == 1
+
+
+def test_optimizer_continues_search_after_a_passing_benchmark() -> None:
+    metrics = ModelMetrics(
+        task_type="classification",
+        model_name="random_forest",
+        n_train=50,
+        n_test=20,
+        primary_metric="f1",
+        primary_value=0.70,
+        f1=0.70,
+    )
+    benchmark = BenchmarkResult(
+        baseline=metrics.model_copy(update={"primary_value": 0.60, "f1": 0.60}),
+        augmented=metrics,
+        improvement={"primary_value": 0.10},
+        improved=True,
+        split_seed=42,
+    )
+    decision = OptimizationAgent().decide(
+        iteration=1,
+        max_iterations=3,
+        current_plan=GenerationPlan(
+            generator="gaussian_copula", num_samples=50, reason="test", original_rows=100
+        ),
+        benchmark=benchmark,
+        validation=_validation(0.8),
+        tried_generators=["gaussian_copula"],
+    )
+
+    assert decision.continue_loop is True
+    assert decision.accept is False
 
 
 def test_generation_planner_records_sample_count_details() -> None:

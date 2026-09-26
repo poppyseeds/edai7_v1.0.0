@@ -90,19 +90,14 @@ class OptimizationAgent:
         validation: ValidationResult,
         tried_generators: list[str],
     ) -> OptimizationDecision:
-        if benchmark is not None and benchmark.improved:
-            return OptimizationDecision(
-                continue_loop=False,
-                next_generator=None,
-                reason="Downstream performance improved; accepting this synthetic dataset.",
-                iteration=iteration,
-                accept=True,
-            )
         if iteration >= max_iterations:
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
-                reason=f"Reached max_iterations={max_iterations} without a required improvement.",
+                reason=(
+                    f"Reached max_iterations={max_iterations}; the pipeline will select the "
+                    "best candidate that meets all acceptance thresholds."
+                ),
                 iteration=iteration,
                 accept=False,
             )
@@ -120,10 +115,11 @@ class OptimizationAgent:
         next_generator, next_samples = candidate
         delta = benchmark.improvement.get("primary_value") if benchmark else None
         delta_text = f", delta={delta:+.4f}" if delta is not None else ""
+        status = "met the score threshold" if benchmark and benchmark.improved else "did not meet the score threshold"
         reason = (
-            f"{current_plan.generator} with {current_plan.num_samples} samples did not improve "
-            f"downstream utility (validation={validation.overall_score:.3f}{delta_text}). "
-            f"Next candidate: {next_generator} + {next_samples}."
+            f"{current_plan.generator} with {current_plan.num_samples} samples {status} "
+            f"(validation={validation.overall_score:.3f}{delta_text}). "
+            f"Continue the configured search with {next_generator} + {next_samples}."
         )
         logger.info(reason)
         return OptimizationDecision(
@@ -145,19 +141,14 @@ class OptimizationAgent:
         utility: UnsupervisedUtilityResult,
         tried_generators: list[str],
     ) -> OptimizationDecision:
-        if validation.passed and utility.passed:
-            return OptimizationDecision(
-                continue_loop=False,
-                next_generator=None,
-                reason="Synthetic-data quality and unsupervised/statistical utility passed configured thresholds.",
-                iteration=iteration,
-                accept=True,
-            )
         if iteration >= max_iterations:
             return OptimizationDecision(
                 continue_loop=False,
                 next_generator=None,
-                reason=f"Reached max_iterations={max_iterations} without passing quality thresholds.",
+                reason=(
+                    f"Reached max_iterations={max_iterations}; the pipeline will select the "
+                    "best candidate that passes the unlabeled quality thresholds."
+                ),
                 iteration=iteration,
                 accept=False,
             )
@@ -173,10 +164,12 @@ class OptimizationAgent:
             )
 
         next_generator, next_samples = candidate
+        passed = validation.passed and utility.passed
+        status = "passed" if passed else "did not pass"
         reason = (
-            f"{current_plan.generator} with {current_plan.num_samples} samples did not pass "
+            f"{current_plan.generator} with {current_plan.num_samples} samples {status} "
             f"unlabeled thresholds (validation={validation.overall_score:.3f}, "
-            f"utility={utility.overall_score:.3f}). Next candidate: "
+            f"utility={utility.overall_score:.3f}). Continue the configured search with "
             f"{next_generator} + {next_samples}."
         )
         logger.info(reason)

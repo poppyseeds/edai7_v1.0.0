@@ -41,6 +41,7 @@ class PipelineConfig:
     ctgan_epochs: int | None = None
     tvae_epochs: int | None = None
     min_improvement: float | None = None
+    min_absolute_improvement: float | None = None
     test_size: float | None = None
     enable_llm: bool = True
     auto_detect_target: bool = False
@@ -262,6 +263,7 @@ def run_pipeline(
                 task_type=analysis.task_type,
                 random_state=random_state,
                 min_improvement=cfg.min_improvement,
+                min_absolute_improvement=cfg.min_absolute_improvement,
             )
             log(
                 "Benchmark",
@@ -283,8 +285,15 @@ def run_pipeline(
                     "iteration",
                 )
         else:
-            utility = evaluate_unsupervised_utility(fit_df, synthetic)
-            log("Utility", f"Statistical utility: {utility.overall_score:.3f}")
+            utility = evaluate_unsupervised_utility(
+                fit_df, synthetic, random_state=random_state
+            )
+            knn_text = (
+                f"; KNN similarity={utility.knn_similarity_score:.3f}"
+                if utility.knn_similarity_score is not None
+                else "; KNN comparison unavailable for this small sample"
+            )
+            log("Utility", f"Unlabeled similarity benchmark: {utility.overall_score:.3f}{knn_text}")
             iter_score = utility.overall_score
             if reasoner:
                 llm_summaries[f"iteration_{i}"] = reasoner.explain(
@@ -333,16 +342,6 @@ def run_pipeline(
             )
         decisions.append(decision)
         record.decision = "accepted" if decision.accept else ("retry" if decision.continue_loop else "stopped")
-        if decision.accept:
-            improved = True
-            log(
-                "Optimizer",
-                "Utility improved" if evaluation_mode == "labeled" else "Synthetic-data quality improved",
-            )
-            best_synth = synthetic
-            best_path = str(synth_path)
-            best_iter = i
-            break
         if not decision.continue_loop:
             log("Optimizer", decision.reason)
             break
@@ -425,9 +424,32 @@ def run_pipeline(
         meta_path = output_dir / f"{run_id}_provenance.json"
         meta_path.write_text(provenance.model_dump_json(indent=2), encoding="utf-8")
 
-    final_decision = (
-        "completed_improved" if improved else "completed_no_improvement"
-    )
+    best_record = None
+    if best_iter is not None and iterations:
+        best_record = next((rec for rec in iterations if rec.iteration == best_iter), iterations[-1])
+        if evaluation_mode == "labeled":
+            improved = bool(
+                best_record.benchmark
+                and best_record.benchmark.improved
+                and best_record.validation.passed
+            )
+        else:
+            improved = bool(
+                best_record.unsupervised_utility
+                and best_record.unsupervised_utility.passed
+                and best_record.validation.passed
+            )
+        best_record.decision = "accepted" if improved else "best_candidate_not_accepted"
+        log(
+            "Optimizer",
+            (
+                "Selected the best candidate after evaluating the configured search budget."
+                if improved
+                else "Selected the highest-scoring candidate, but it did not meet every acceptance threshold."
+            ),
+        )
+
+    final_decision = "completed_improved" if improved else "completed_no_improvement"
     if best_synth is None:
         final_decision = "failed"
         log("Pipeline", "No synthetic dataset was produced")
@@ -435,8 +457,7 @@ def run_pipeline(
         log("Pipeline", "Completed successfully")
 
     final_evaluation = {}
-    if best_iter is not None and iterations:
-        best_record = next((rec for rec in iterations if rec.iteration == best_iter), iterations[-1])
+    if best_record is not None:
         final_evaluation = {
             "evaluation_mode": evaluation_mode,
             "validation": best_record.validation.model_dump(),
