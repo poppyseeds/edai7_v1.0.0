@@ -98,9 +98,9 @@ The project is necessary as both an engineering system and an educational artifa
 
 ## 3.1 Core problem
 
-The core problem is to generate synthetic data that is useful enough for a declared purpose while managing fidelity, structural validity, privacy risk, computational cost, and experimental integrity. Formally, let a real training dataset be (D_{train}), a generator with configuration \(\theta\) be \(G_\theta\), and a synthetic dataset be \(\tilde D=G_\theta(D_{train})\). The platform seeks a candidate from a bounded set that performs well on a vector of measured objectives:
+The core problem is to generate synthetic data that is useful enough for a declared purpose while managing fidelity, structural validity, privacy risk, computational cost, and experimental integrity. Formally, let a real training dataset be $D_{\mathrm{train}}$, a generator with configuration $\theta$ be $G_\theta$, and a synthetic dataset be $\tilde D=G_\theta(D_{\mathrm{train}})$. The platform seeks a candidate from a bounded set that performs well on a vector of measured objectives:
 
-\[
+$$
 \mathbf{J}(\tilde D)=
 \left[
 J_{fidelity},
@@ -111,7 +111,7 @@ J_{privacy},
 J_{validity},
 -J_{cost}
 \right].
-\]
+$$
 
 This is not reduced to unconstrained maximization. Privacy, exact-copy rate, validity, and minimum distribution similarity form hard acceptance conditions. The candidate set is also bounded by installed dependencies, modality, data type, conditional requirements, execution device, iteration count, and synthetic-row budget.
 
@@ -428,17 +428,17 @@ The full dataset analysis is retained for descriptive display, but the analyzer 
 
 **Processing logic.** `SamplePlanner` selects a mode. For imbalanced classification, it plans minority-only augmentation. For a small unlabeled or otherwise suitable dataset, it uses configured ratios. Healthy large datasets can skip generation. An explicit `PipelineConfig.synthetic_ratio` overrides general ratios but does not replace the specialized minority calculation.
 
-For a minority class count \(N_{min}\), original training rows \(N\), and target population ratio \(r\):
+For a minority class count $N_{min}$, original training rows $N$, and target population ratio $r$:
 
-\[
+$$
 N_{desired}=\max\left(N_{min},\left\lceil N r\right\rceil\right),
-\]
+$$
 
-\[
+$$
 N_{request}=N_{desired}-N_{min},
 \qquad
 N_{synthetic}=\min\left(N_{request},\left\lfloor N r_{iteration}\right\rfloor\right).
-\]
+$$
 
 The default severe-imbalance target ratio is 0.20, moderate target ratio is 0.40, small-dataset ratio is 0.50, low-diversity ratio is 0.30, general ratio is 0.20, and per-iteration cap is 0.50. The total search budget is capped at 1.50 times the original training population.
 
@@ -482,9 +482,9 @@ Small datasets favor Gaussian Copula and penalize neural models. Large tables fa
 
 The overall score is:
 
-\[
+$$
 S_{overall}=\frac{S_{fidelity}+S_{distribution}+S_{correlation}+S_{diversity}+S_{privacy}}{5}.
-\]
+$$
 
 Default hard gates require overall validation of at least 0.55, privacy score of at least 0.70, exact-match rate of at most 0.05, constraint validity of at least 0.95, and distribution score of at least 0.60.
 
@@ -498,15 +498,15 @@ Default hard gates require overall validation of at least 0.55, privacy score of
 
 **Input.** Real training data, real validation data, synthetic records, target, task type, seed, and improvement thresholds.
 
-**Processing logic.** The same downstream model and preprocessing design is trained once on real training data and once on real plus synthetic training data. Both are evaluated on identical held-out real validation rows. Classification uses macro F1 as the primary metric; regression uses \(R^2\). MAE and RMSE improvements reverse their sign so that a positive change always represents improvement.
+**Processing logic.** The same downstream model and preprocessing design is trained once on real training data and once on real plus synthetic training data. Both are evaluated on identical held-out real validation rows. Classification uses macro F1 as the primary metric; regression uses $R^2$. MAE and RMSE improvements reverse their sign so that a positive change always represents improvement.
 
 Acceptance requires both a relative and absolute gain:
 
-\[
+$$
 \Delta_{relative}\ge 0.02
 \quad\land\quad
 \Delta_{absolute}\ge 0.01.
-\]
+$$
 
 After selection is frozen, the comparison is repeated once on final-test rows. The final result counts as improved only when validation and final-test requirements both pass alongside quality gates.
 
@@ -522,9 +522,9 @@ After selection is frozen, the comparison is repeated once on final-test rows. T
 
 **Processing logic.** The system combines distribution, correlation, diversity, PCA structure, and K-nearest-neighbor real-versus-synthetic separability. If a discriminator AUC is 0.5, the datasets are difficult to distinguish. The similarity mapping is:
 
-\[
+$$
 S_{disc}=\operatorname{clip}\left(1-2|AUC-0.5|,0,1\right).
-\]
+$$
 
 This metric is not presented as target-prediction accuracy. It answers whether local neighborhoods can separate real from synthetic rows.
 
@@ -552,11 +552,11 @@ For labeled data, the selected candidate receives one final-test comparison. Fai
 
 Training medians, minimums, and spans are calculated from training observations only. The selected missing policy is applied, and residual missingness or infinity causes failure. Normalization is:
 
-For feature \(j\), define \(s_j=x_{max,train,j}-x_{min,train,j}\) when that difference is positive and \(s_j=1\) only for a constant training feature. Normalization is then:
+For feature $j$, define $s_j=x_{max,train,j}-x_{min,train,j}$ when that difference is positive and $s_j=1$ only for a constant training feature. Normalization is then:
 
-\[
+$$
 x'_j=2\frac{x_j-x_{min,train,j}}{s_j}-1.
-\]
+$$
 
 Windows are then created independently within each entity and split using the configured length and stride. Each window retains source rows, timestamps, entity, and context provenance.
 
@@ -584,56 +584,56 @@ Generated normalized tensors are inverse-transformed into physical units and exp
 
 ## 8.1 Empirical bootstrap
 
-The bootstrap adapter is a real algorithmic baseline, not a substitute presented under another name. It samples real training rows with replacement. For each numerical feature \(j\), it adds small Gaussian perturbation and clips the result to observed bounds:
+The bootstrap adapter is a real algorithmic baseline, not a substitute presented under another name. It samples real training rows with replacement. For each numerical feature $j$, it adds small Gaussian perturbation and clips the result to observed bounds:
 
-\[
+$$
 \tilde x_{ij}=\operatorname{clip}\left(x_{ij}+\epsilon_j,\min X_j,\max X_j\right),
 \qquad
 \epsilon_j\sim\mathcal{N}\left(0,(0.01\sigma_j)^2\right).
-\]
+$$
 
-Conditional mode first filters source training rows and then samples from that subset. Boolean and integer-like types are restored. The algorithm is fast, deterministic for a seed, and useful as a control. Its primary weakness is memorization: categorical combinations and much of each row originate directly from real data. Approximate generation complexity is \(O(md)\) for \(m\) rows and \(d\) columns.
+Conditional mode first filters source training rows and then samples from that subset. Boolean and integer-like types are restored. The algorithm is fast, deterministic for a seed, and useful as a control. Its primary weakness is memorization: categorical combinations and much of each row originate directly from real data. Approximate generation complexity is $O(md)$ for $m$ rows and $d$ columns.
 
 ## 8.2 Gaussian Copula
 
-The Gaussian Copula adapter delegates implementation details to SDV. Conceptually, each variable’s marginal cumulative distribution \(F_j\) maps observations into latent normal coordinates:
+The Gaussian Copula adapter delegates implementation details to SDV. Conceptually, each variable’s marginal cumulative distribution $F_j$ maps observations into latent normal coordinates:
 
-\[
+$$
 z_j=\Phi^{-1}(F_j(x_j)),
-\]
+$$
 
-where \(\Phi^{-1}\) is the inverse standard-normal CDF. A multivariate Gaussian dependence model is fit in latent space. Sampling draws \(\tilde z\) and applies inverse marginals:
+where $\Phi^{-1}$ is the inverse standard-normal CDF. A multivariate Gaussian dependence model is fit in latent space. Sampling draws $\tilde z$ and applies inverse marginals:
 
-\[
+$$
 \tilde x_j=F_j^{-1}(\Phi(\tilde z_j)).
-\]
+$$
 
-The method is attractive for smaller tables because fitting and sampling are stable and comparatively inexpensive. It can preserve rank-like relationships and mixed marginals, but a Gaussian latent dependence structure may miss complex nonlinear or conditional modes. A dense approximation gives fitting cost near \(O(nd^2+d^3)\) and sampling cost near \(O(md^2)\), although actual SDV transforms and categorical handling determine observed cost.
+The method is attractive for smaller tables because fitting and sampling are stable and comparatively inexpensive. It can preserve rank-like relationships and mixed marginals, but a Gaussian latent dependence structure may miss complex nonlinear or conditional modes. A dense approximation gives fitting cost near $O(nd^2+d^3)$ and sampling cost near $O(md^2)$, although actual SDV transforms and categorical handling determine observed cost.
 
 ## 8.3 CTGAN
 
 CTGAN is used through SDV’s `CTGANSynthesizer`. It addresses mixed tabular distributions with conditional training and specialized transforms. Its adversarial foundation can be expressed as:
 
-\[
+$$
 \min_G\max_D
 \mathbb{E}_{x\sim p_{data}}[\log D(x,c)]
 +
 \mathbb{E}_{z\sim p(z)}[\log(1-D(G(z,c),c))],
-\]
+$$
 
-where \(c\) represents a sampled category condition. Conditioning improves exposure to rare discrete modes. The platform exposes epochs, batch size, device, and seed and requires CTGAN batch size to be divisible by the default packing factor of 10. Strengths include mixed-data capability and minority conditioning. Weaknesses include training instability, computational cost, sensitivity to hyperparameters, and the possibility that conditional rejection still fails for poorly learned rare events. Complexity is dominated by epochs times batches times the generator and discriminator network costs.
+where $c$ represents a sampled category condition. Conditioning improves exposure to rare discrete modes. The platform exposes epochs, batch size, device, and seed and requires CTGAN batch size to be divisible by the default packing factor of 10. Strengths include mixed-data capability and minority conditioning. Weaknesses include training instability, computational cost, sensitivity to hyperparameters, and the possibility that conditional rejection still fails for poorly learned rare events. Complexity is dominated by epochs times batches times the generator and discriminator network costs.
 
 ## 8.4 TVAE
 
 TVAE is also delegated to SDV. Its theoretical objective is a reconstruction term plus Kullback–Leibler regularization:
 
-\[
+$$
 \mathcal L_{VAE}
 =
 \mathbb E_{q_\phi(z\mid x)}[-\log p_\theta(x\mid z)]
 +
 \beta D_{KL}(q_\phi(z\mid x)\|p(z)).
-\]
+$$
 
 The encoder learns a distribution over latent variables and the decoder reconstructs table values. The smooth latent space can support stable sampling, but it may blur sharp or multimodal structures. The current adapter’s conditional behavior is SDV rejection sampling, not a conditional-VAE objective. Rare conditions can therefore exhaust the explicit `max_tries_per_batch` limit. The project increased the default bounded attempt budget from SDV’s common 100 to 1,000 but still fails rather than substituting another model.
 
@@ -641,108 +641,108 @@ The encoder learns a distribution over latent variables and the decoder reconstr
 
 TabSyn uses a local training-only codec and pinned upstream neural components. High-cardinality numerical variables receive median imputation and a normal-output quantile transform. Numerical missingness is represented by an explicit Boolean categorical indicator. Categorical, Boolean, and low-cardinality columns use recorded vocabularies. Codec state is JSON-serializable, reversible, and retains column ordering and data types.
 
-Quantile fitting is approximately \(O(d_n n\log n)\) for \(d_n\) numerical features. The encoded matrix requires \(O(n(d_n+d_c))\) storage. Unknown or invalid inverse values are handled by the explicit vocabulary and numeric inverse transforms rather than executable pickle preprocessing.
+Quantile fitting is approximately $O(d_n n\log n)$ for $d_n$ numerical features. The encoded matrix requires $O(n(d_n+d_c))$ storage. Unknown or invalid inverse values are handled by the explicit vocabulary and numeric inverse transforms rather than executable pickle preprocessing.
 
 ## 8.6 TabSyn VAE and latent diffusion
 
 The worker first trains the upstream TabSyn VAE. Numerical outputs use mean squared error, categorical outputs use mean cross-entropy, and latent regularization uses a KL term:
 
-\[
+$$
 \mathcal L_{TabSynVAE}
 =
 MSE(\hat x_{num},x_{num})
 +\frac{1}{C}\sum_{c=1}^{C} CE(\hat x_c,x_c)
 -\frac{\beta}{2}\mathbb E[1+\log\sigma^2-\mu^2-\sigma^2].
-\]
+$$
 
 Encoder latents are flattened, centered, and divided by two according to the integration’s upstream normalization. A diffusion model then learns the latent distribution. Sampling applies the upstream denoiser for a configurable number of steps, restores the latent mean and scale, decodes numerical and categorical outputs, and performs codec inversion.
 
-Default advanced parameters are 100 VAE epochs, 100 diffusion epochs, token dimension 4, hidden dimension 128, two layers, factor 8, 50 sampling steps, learning rate \(10^{-3}\), KL weight \(10^{-3}\), and one CPU thread. The checkpoint stores decoder weights, diffusion weights, and latent mean. Sampling reloads with `weights_only=True`.
+Default advanced parameters are 100 VAE epochs, 100 diffusion epochs, token dimension 4, hidden dimension 128, two layers, factor 8, 50 sampling steps, learning rate $10^{-3}$, KL weight $10^{-3}$, and one CPU thread. The checkpoint stores decoder weights, diffusion weights, and latent mean. Sampling reloads with `weights_only=True`.
 
-The integration’s strengths are mixed-table support, source pinning, reversible preprocessing, process isolation, and real checkpoint reload. Its limitations are unconditional generation, a local fixed-epoch schedule, absence of the full upstream scheduler, and no claim of exact paper reproduction. Sampling cost is approximately \(O(mS C_{denoise})\), where \(S\) is the number of reverse steps.
+The integration’s strengths are mixed-table support, source pinning, reversible preprocessing, process isolation, and real checkpoint reload. Its limitations are unconditional generation, a local fixed-epoch schedule, absence of the full upstream scheduler, and no claim of exact paper reproduction. Sampling cost is approximately $O(mS C_{denoise})$, where $S$ is the number of reverse steps.
 
 ## 8.7 Diffusion-TS
 
 Diffusion-TS models a forward corruption process and learns its reverse. A standard diffusion step has the form:
 
-\[
+$$
 q(x_t\mid x_{t-1})=
 \mathcal N\left(\sqrt{1-\beta_t}x_{t-1},\beta_t I\right).
-\]
+$$
 
 The pinned upstream `Diffusion_TS` network receives fixed sequence length, feature count, encoder and decoder layer counts, hidden dimension, attention heads, diffusion timesteps, and sampling timesteps. The worker invokes the upstream model loss, including its temporal and Fourier-aware behavior, and optimizes with Adam. The local loop deliberately omits the full upstream EMA and scheduler and records that adaptation.
 
-`SequenceConfig` defaults to 100 epochs, batch size 32, hidden dimension 64, two layers, four heads, 500 diffusion timesteps, 50 sampling steps, learning rate \(10^{-4}\), and one thread. Hidden dimension must be even and divisible by the number of heads; sampling steps cannot exceed diffusion timesteps. Output must be finite and exactly shaped \([m,L,F]\).
+`SequenceConfig` defaults to 100 epochs, batch size 32, hidden dimension 64, two layers, four heads, 500 diffusion timesteps, 50 sampling steps, learning rate $10^{-4}$, and one thread. Hidden dimension must be even and divisible by the number of heads; sampling steps cannot exceed diffusion timesteps. Output must be finite and exactly shaped $[m,L,F]$.
 
-Diffusion models can represent complex multi-scale temporal distributions and offer a stable likelihood-inspired training process, but reverse sampling is expensive and fixed-window handling does not provide arbitrary-length generation. Training complexity depends on epochs, number of windows, diffusion loss evaluations, attention width, and sequence length. Sampling is approximately \(O(mS C_{network})\).
+Diffusion models can represent complex multi-scale temporal distributions and offer a stable likelihood-inspired training process, but reverse sampling is expensive and fixed-window handling does not provide arbitrary-length generation. Training complexity depends on epochs, number of windows, diffusion loss evaluations, attention width, and sequence length. Sampling is approximately $O(mS C_{network})$.
 
 ## 8.8 TimeGAN PyTorch baseline
 
-The local implementation contains five GRU-based subnetworks: embedder \(E\), recovery \(R\), generator \(G\), supervisor \(S\), and discriminator \(D\). A `RecurrentBlock` applies a GRU followed by linear projection; all networks except the discriminator use a sigmoid output.
+The local implementation contains five GRU-based subnetworks: embedder $E$, recovery $R$, generator $G$, supervisor $S$, and discriminator $D$. A `RecurrentBlock` applies a GRU followed by linear projection; all networks except the discriminator use a sigmoid output.
 
 Training has three phases. First, the embedding and recovery networks minimize reconstruction:
 
-\[
+$$
 \mathcal L_{reconstruction}=10\sqrt{MSE(R(E(X)),X)+\epsilon}.
-\]
+$$
 
 Second, the supervisor learns one-step latent dynamics:
 
-\[
+$$
 \mathcal L_{sup}=MSE(S(H)_{1:T-1},H_{2:T}).
-\]
+$$
 
 Third, joint training combines adversarial loss, supervised dynamics, and first/second moment matching:
 
-\[
+$$
 \mathcal L_G=
 BCE(D(S(G(Z))),1)+BCE(D(G(Z)),1)
 +100\sqrt{\mathcal L_{sup}+\epsilon}
 +100\mathcal L_{mom},
-\]
+$$
 
-\[
+$$
 \mathcal L_{mom}=
 \|\mu_X-\mu_{\tilde X}\|_1+
 \|\sigma_X-\sigma_{\tilde X}\|_1.
-\]
+$$
 
 The joint embedder objective is:
 
-\[
+$$
 \mathcal L_{E,joint}=
 10\sqrt{MSE(R(E(X)),X)+\epsilon}+0.1\mathcal L_{sup}.
-\]
+$$
 
-Two generator/embedder updates occur per discriminator pass. The discriminator only steps when its loss exceeds 0.15. For sequence length \(L\), feature width \(F\), and hidden width \(H\), a GRU pass is approximately \(O(LH(H+F))\) per sample, multiplied by subnetworks and training phases.
+Two generator/embedder updates occur per discriminator pass. The discriminator only steps when its loss exceeds 0.15. For sequence length $L$, feature width $F$, and hidden width $H$, a GRU pass is approximately $O(LH(H+F))$ per sample, multiplied by subnetworks and training phases.
 
 The implementation is a faithful comparative baseline in objective structure, but it is a fixed-window PyTorch reimplementation, not a port of TensorFlow checkpoints or a bitwise reproduction of the original implementation.
 
 ## 8.9 Window bootstrap control
 
-The temporal bootstrap selects normalized training windows exactly with replacement. Its time and copy complexity are \(O(mLF)\). It is intentionally expected to fail exact-copy privacy gates and serves as a control that demonstrates whether the evaluation can identify memorization. It should not be described as a safe generative model simply because it produces correctly shaped arrays.
+The temporal bootstrap selects normalized training windows exactly with replacement. Its time and copy complexity are $O(mLF)$. It is intentionally expected to fail exact-copy privacy gates and serves as a control that demonstrates whether the evaluation can identify memorization. It should not be described as a safe generative model simply because it produces correctly shaped arrays.
 
 ## 8.10 Tabular fidelity and distribution metrics
 
 For a numerical feature, fidelity is based on the two-sample Kolmogorov–Smirnov statistic:
 
-\[
+$$
 S_{KS}=1-D_{KS}.
-\]
+$$
 
 Categorical fidelity uses total variation distance:
 
-\[
+$$
 TV(P,Q)=\frac{1}{2}\sum_k|p_k-q_k|,
 \qquad
 S_{cat}=1-TV(P,Q).
-\]
+$$
 
 Numerical distribution similarity also reports normalized Wasserstein behavior:
 
-\[
+$$
 S_W=\frac{1}{1+W_1(X,\tilde X)/\max(\sigma_X,\epsilon)}.
-\]
+$$
 
 Additional evidence includes quantile error, histogram overlap, categorical Jensen–Shannon divergence, and category coverage. These measurements reveal different failure modes; no single marginal metric proves joint fidelity.
 
@@ -750,18 +750,18 @@ Additional evidence includes quantile error, histogram overlap, categorical Jens
 
 Numerical correlation similarity is approximately:
 
-\[
+$$
 S_{corr}=1-\operatorname{mean}_{i<j}|\rho^{real}_{ij}-\rho^{synthetic}_{ij}|.
-\]
+$$
 
 Advanced dependency checks also compare Spearman correlation, Cramér’s V for categorical pairs, and correlation ratio for mixed pairs. Diversity averages unique-row ratio, original-category coverage, and original numerical-range coverage.
 
 The RBF-kernel maximum mean discrepancy is:
 
-\[
+$$
 MMD^2=
 \mathbb E[k(X,X')]+\mathbb E[k(Y,Y')]-2\mathbb E[k(X,Y)].
-\]
+$$
 
 The kernel bandwidth uses a median-distance heuristic. Because kernel matrices are quadratic, samples are capped by default at 500. A logistic-regression, random-forest, and histogram-gradient-boosting ensemble attempts to distinguish real from synthetic records. AUC is mapped to similarity using the discriminator equation given earlier. AUC near 0.5 is desirable, but can also occur when both datasets are poor or the test lacks power; it must be interpreted alongside other metrics.
 
@@ -769,33 +769,33 @@ The kernel bandwidth uses a median-distance heuristic. Because kernel matrices a
 
 The main tabular privacy score is a transparent prototype indicator:
 
-\[
+$$
 S_{privacy}=1-0.7r_{exact}-0.3r_{near}.
-\]
+$$
 
-The research engine additionally compares synthetic-to-training and synthetic-to-holdout distances and computes a membership-style distance attack AUC. Sample counts are capped at 128 to bound pairwise work. These values describe empirical exposure under a particular distance representation. They do not provide \((\epsilon,\delta)\)-differential privacy or guarantee that an adversary cannot infer membership.
+The research engine additionally compares synthetic-to-training and synthetic-to-holdout distances and computes a membership-style distance attack AUC. Sample counts are capped at 128 to bound pairwise work. These values describe empirical exposure under a particular distance representation. They do not provide $(\epsilon,\delta)$-differential privacy or guarantee that an adversary cannot infer membership.
 
 Constraint discovery captures observed numerical bounds, integer-only behavior, non-negativity, unit intervals, constant columns, datetime ranges, and finite categorical vocabularies. Validation measures violations; it does not silently repair generated output. This preserves the distinction between model quality and post-processing.
 
 ## 8.13 Temporal metrics
 
-For each feature, the temporal evaluator reports flattened-marginal KS, normalized mean error, normalized variance error, trend error, autocorrelation error, and power-spectrum Jensen–Shannon divergence. Autocorrelation is evaluated for lags 1 through \(\min(10,\lfloor L/4\rfloor)\). Lag-zero and lag-one cross-feature correlation differences measure multivariate temporal dependence. The exact unique-sequence ratio reveals repeated arrays.
+For each feature, the temporal evaluator reports flattened-marginal KS, normalized mean error, normalized variance error, trend error, autocorrelation error, and power-spectrum Jensen–Shannon divergence. Autocorrelation is evaluated for lags 1 through $\min(10,\lfloor L/4\rfloor)$. Lag-zero and lag-one cross-feature correlation differences measure multivariate temporal dependence. The exact unique-sequence ratio reveals repeated arrays.
 
-Approximate complexity is \(O(FN\log N)\) for sorted marginal comparisons, \(O(FWL\ell)\) for ACF across \(\ell\) lags, \(O(FWL\log L)\) for FFT spectra, and \(O(F^2WL)\) for cross-feature dependence. Constant signals can make a metric undefined; the evaluator returns null rather than claiming perfect preservation.
+Approximate complexity is $O(FN\log N)$ for sorted marginal comparisons, $O(FWL\ell)$ for ACF across $\ell$ lags, $O(FWL\log L)$ for FFT spectra, and $O(F^2WL)$ for cross-feature dependence. Constant signals can make a metric undefined; the evaluator returns null rather than claiming perfect preservation.
 
 ## 8.14 Forecasting methodology
 
-When a forecast target and horizon are configured, a fixed Ridge model with \(\alpha=1\) flattens prefix windows and predicts the requested future target. Real-only, synthetic-only, and augmented training sets are evaluated on the same chronological held-out windows. MAE and RMSE are restored to original physical target units using the training span. This fixed estimator controls downstream-model variation, but it measures one forecast task rather than universal temporal usefulness.
+When a forecast target and horizon are configured, a fixed Ridge model with $\alpha=1$ flattens prefix windows and predicts the requested future target. Real-only, synthetic-only, and augmented training sets are evaluated on the same chronological held-out windows. MAE and RMSE are restored to original physical target units using the training span. This fixed estimator controls downstream-model variation, but it measures one forecast task rather than universal temporal usefulness.
 
 ## 8.15 Selection methodology and complexity
 
 The active main pipeline uses explainable model ranking followed by early stopping. The research engine also supports a bounded adaptive selector. Candidates are evaluated on validation data. Gate-passing candidates are preferred; failed trials remain recorded. A Pareto frontier treats validation score as increasing and measured fit-plus-sample cost as decreasing. The selected frontier candidate maximizes:
 
-\[
+$$
 J_{select}=S_{validation}-\lambda\frac{C}{\max C_{frontier}},
-\]
+$$
 
-with default cost weight \(\lambda=0.05\). Frontier construction is \(O(K^2)\), but \(K\le 8\), so model training dominates computation. The bounded search does not establish global optimality.
+with default cost weight $\lambda=0.05$. Frontier construction is $O(K^2)$, but $K\le 8$, so model training dominates computation. The bounded search does not establish global optimality.
 
 # 9. Data Pipeline
 
@@ -1083,7 +1083,7 @@ Tabular research experiments support TRTR, TSTR, augmented utility, empirical pr
 
 `DownstreamModel` builds a `ColumnTransformer`: numerical fields receive median imputation and standard scaling; categorical fields receive most-frequent imputation and one-hot encoding with unknown-category handling. The default classifier or regressor is a 150-tree random forest with `min_samples_leaf=2`; the model suite can also evaluate logistic regression or Ridge and histogram gradient boosting.
 
-Classification reports accuracy, macro precision, macro recall, macro F1, and binary ROC-AUC when available. Regression reports MAE, RMSE, and \(R^2\). Macro metrics avoid allowing a majority class to dominate the primary comparison.
+Classification reports accuracy, macro precision, macro recall, macro F1, and binary ROC-AUC when available. Regression reports MAE, RMSE, and $R^2$. Macro metrics avoid allowing a majority class to dominate the primary comparison.
 
 ## 13.10 Reporting and provenance
 
@@ -1258,23 +1258,23 @@ Actual unified API smokes completed for Diffusion-TS and `timegan_torch`. No ful
 
 Tabular in-process work consumes memory for the original DataFrame, split copies, generated candidates, transformed matrices, model state, and persisted previews. `RUNS` retains original and synthetic DataFrames, so a long-lived process can grow with completed jobs. Pandas memory can substantially exceed raw CSV size.
 
-Temporal tensors require approximately \(4WLF\) bytes for a single float32 window array, excluding provenance, model activations, gradients, optimizer state, and copies. Neural training memory is normally dominated by parameters, activations, and optimizer states rather than persisted input alone. The recorded GPU allocation is configuration-specific and cannot be extrapolated to arbitrary sequence lengths or hidden widths.
+Temporal tensors require approximately $4WLF$ bytes for a single float32 window array, excluding provenance, model activations, gradients, optimizer state, and copies. Neural training memory is normally dominated by parameters, activations, and optimizer states rather than persisted input alone. The recorded GPU allocation is configuration-specific and cannot be extrapolated to arbitrary sequence lengths or hidden widths.
 
 ## 16.3 Time complexity summary
 
 | Operation | Approximate complexity |
 | --- | --- |
-| Dataframe statistics | \(O(nd)\) plus correlation \(O(nd^2)\) |
-| Bootstrap generation | \(O(md)\) |
-| Dense Gaussian copula fitting | Approximately \(O(nd^2+d^3)\) |
+| Dataframe statistics | $O(nd)$ plus correlation $O(nd^2)$ |
+| Bootstrap generation | $O(md)$ |
+| Dense Gaussian copula fitting | Approximately $O(nd^2+d^3)$ |
 | Neural tabular training | Epochs × batches × network cost |
-| TabSyn sampling | \(O(mS C_{denoise})\) |
-| Temporal window construction | \(O(n\log n+WLF)\) including sorting |
-| TimeGAN GRU pass | \(O(LH(H+F))\) per sample per network |
-| Diffusion-TS sampling | \(O(mS C_{network})\) |
-| MMD at cap \(c\) | \(O(c^2p)\) |
-| Temporal cross-feature metrics | \(O(F^2WL)\) |
-| Adaptive Pareto frontier | \(O(K^2)\), \(K\le8\) |
+| TabSyn sampling | $O(mS C_{denoise})$ |
+| Temporal window construction | $O(n\log n+WLF)$ including sorting |
+| TimeGAN GRU pass | $O(LH(H+F))$ per sample per network |
+| Diffusion-TS sampling | $O(mS C_{network})$ |
+| MMD at cap $c$ | $O(c^2p)$ |
+| Temporal cross-feature metrics | $O(F^2WL)$ |
+| Adaptive Pareto frontier | $O(K^2)$, $K\le8$ |
 
 ## 16.4 Bottlenecks
 
@@ -1337,7 +1337,7 @@ The current trusted-localhost assumption is materially different from an interne
 
 Synthetic data is not automatically anonymous. A generator can copy exact records, create near copies, reproduce rare categories, or allow membership inference. The platform responds with exact and near match rates, distance comparisons against train and holdout controls, attack AUC, artifact gates, and explicit language that these are indicators rather than guarantees.
 
-Formal differential privacy would require a defined adjacency relation, a mechanism with a privacy accountant, recorded \(\epsilon\) and \(\delta\), composition across runs, and utility analysis. None of these are currently implemented. Therefore, an eligible artifact means only that it passed configured prototype gates.
+Formal differential privacy would require a defined adjacency relation, a mechanism with a privacy accountant, recorded $\epsilon$ and $\delta$, composition across runs, and utility analysis. None of these are currently implemented. Therefore, an eligible artifact means only that it passed configured prototype gates.
 
 ## 17.5 Fairness risk
 
