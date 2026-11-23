@@ -50,6 +50,7 @@ with st.sidebar:
         ["auto", "gaussian_copula", "ctgan", "tvae"],
     )
     enable_llm = st.checkbox("Gemini explanations (needs GEMINI_API_KEY)", value=False)
+    st.caption("Enabling explanations sends dataset summaries and measured results to Google when a key is configured.")
     st.markdown(
         "Deep generators (CTGAN/TVAE) are slower. "
         "Use GaussianCopula for a quick demo."
@@ -228,6 +229,8 @@ else:
     st.info(result.final_evaluation.get("reason", "Synthetic generation was not required."))
 
 st.subheader("6. Synthetic data")
+if synthetic is not None and not result.artifact_eligible:
+    st.warning("Audit artifact: this candidate failed quality gates. Download is for inspection.")
 if synthetic is None:
     st.warning("No synthetic dataset was produced.")
 else:
@@ -300,11 +303,12 @@ if result.iterations:
 
 st.subheader("8. Benchmark")
 if result.baseline:
-    last_bench = None
-    if result.best_iteration:
+    last_bench = result.final_benchmark
+    if last_bench is None and result.best_iteration:
         rec = next(it for it in result.iterations if it.iteration == result.best_iteration)
         last_bench = rec.benchmark
     if last_bench:
+        st.caption(f"Evaluation split: {last_bench.evaluation_role}. Candidate search uses validation rows.")
         b, a = last_bench.baseline, last_bench.augmented
         col_a, col_b, col_c = st.columns(3)
         col_a.metric(f"Baseline {b.primary_metric}", f"{b.primary_value:.4f}")
@@ -345,7 +349,7 @@ for rec in result.iterations:
     utility = rec.unsupervised_utility
     if bench:
         primary = bench.augmented.primary_value
-        status = "ACCEPTED" if bench.improved else "NO ML IMPROVEMENT"
+        status = "VALIDATION GAIN" if bench.improved else "NO VALIDATION GAIN"
     elif utility:
         primary = utility.overall_score
         status = "ACCEPTED" if utility.passed and rec.validation.passed else "QUALITY BELOW THRESHOLD"
@@ -385,9 +389,11 @@ if result.iterations:
     )
     st.subheader("Best attempt")
     if best_rec.benchmark:
-        b = best_rec.benchmark.baseline
-        a = best_rec.benchmark.augmented
-        delta = best_rec.benchmark.improvement.get("primary_value")
+        selected_benchmark = result.final_benchmark or best_rec.benchmark
+        st.caption(f"Evaluation split: {selected_benchmark.evaluation_role}")
+        b = selected_benchmark.baseline
+        a = selected_benchmark.augmented
+        delta = selected_benchmark.improvement.get("primary_value")
         ba, bb, bc, bd = st.columns(4)
         ba.metric("Generator", best_rec.plan.generator)
         bb.metric(f"Baseline {b.primary_metric}", f"{b.primary_value:.4f}")

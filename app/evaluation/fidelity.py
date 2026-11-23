@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import jensenshannon
 from scipy.stats import ks_2samp, wasserstein_distance
 
 from app.utils.data_utils import infer_column_types
@@ -72,6 +73,61 @@ def distribution_score(original: pd.DataFrame, synthetic: pd.DataFrame) -> float
         tv = 0.5 * sum(abs(p.get(k, 0.0) - q.get(k, 0.0)) for k in keys)
         parts.append(float(np.clip(1.0 - tv, 0.0, 1.0)))
     return float(np.mean(parts)) if parts else 0.0
+
+
+def distribution_details(original: pd.DataFrame, synthetic: pd.DataFrame) -> dict[str, dict[str, float | str]]:
+    """Return stronger per-column distribution diagnostics without changing scores."""
+
+    numerical, categorical = infer_column_types(original)
+    details: dict[str, dict[str, float | str]] = {}
+    for col in numerical:
+        if col not in synthetic.columns:
+            details[col] = {"status": "missing_in_synthetic"}
+            continue
+        real = pd.to_numeric(_safe_series(original[col]), errors="coerce").dropna()
+        fake = pd.to_numeric(_safe_series(synthetic[col]), errors="coerce").dropna()
+        if len(real) < 2 or len(fake) < 2:
+            details[col] = {"status": "not_applicable"}
+            continue
+        scale = float(real.std(ddof=0) or 1.0)
+        quantiles = np.linspace(0.1, 0.9, 9)
+        quantile_error = float(np.mean(np.abs(np.quantile(real, quantiles) - np.quantile(fake, quantiles))) / scale)
+        low = min(float(real.min()), float(fake.min()))
+        high = max(float(real.max()), float(fake.max()))
+        if high <= low:
+            overlap = 1.0
+        else:
+            real_hist, edges = np.histogram(real, bins=10, range=(low, high), density=True)
+            fake_hist, _ = np.histogram(fake, bins=edges, density=True)
+            overlap = float(np.minimum(real_hist, fake_hist).sum() * np.diff(edges).mean())
+        details[col] = {
+            "status": "computed",
+            "ks_statistic": round(float(ks_2samp(real, fake, method="auto").statistic), 6),
+            "normalized_wasserstein": round(float(wasserstein_distance(real, fake) / scale), 6),
+            "quantile_error": round(quantile_error, 6),
+            "histogram_overlap": round(float(np.clip(overlap, 0.0, 1.0)), 6),
+        }
+    for col in categorical:
+        if col not in synthetic.columns:
+            details[col] = {"status": "missing_in_synthetic"}
+            continue
+        p = original[col].dropna().astype(str).value_counts(normalize=True)
+        q = synthetic[col].dropna().astype(str).value_counts(normalize=True)
+        if p.empty or q.empty:
+            details[col] = {"status": "not_applicable"}
+            continue
+        keys = sorted(set(p.index) | set(q.index))
+        real_probs = np.array([p.get(key, 0.0) for key in keys], dtype=float)
+        fake_probs = np.array([q.get(key, 0.0) for key in keys], dtype=float)
+        tv = 0.5 * float(np.abs(real_probs - fake_probs).sum())
+        js = float(jensenshannon(real_probs, fake_probs, base=2.0) ** 2)
+        details[col] = {
+            "status": "computed",
+            "total_variation_distance": round(tv, 6),
+            "jensen_shannon_divergence": round(js, 6),
+            "category_coverage": round(float(sum(fake_probs > 0) / max(sum(real_probs > 0), 1)), 6),
+        }
+    return details
 
 
 def correlation_score(original: pd.DataFrame, synthetic: pd.DataFrame) -> float:

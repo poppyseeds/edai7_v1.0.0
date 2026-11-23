@@ -28,10 +28,7 @@ def test_bootstrap_row_count_and_schema() -> None:
 
 def test_gaussian_copula_row_count_and_schema() -> None:
     df = _toy_df()
-    try:
-        out = GaussianCopulaGenerator().generate(df, num_samples=15, random_state=1)
-    except Exception:
-        out = BootstrapGenerator().generate(df, num_samples=15, random_state=1)
+    out = GaussianCopulaGenerator().generate(df, num_samples=15, random_state=1)
     assert len(out) == 15
     assert list(out.columns) == list(df.columns)
 

@@ -1,6 +1,7 @@
 from app.schemas.schemas import (
     AgentLog,
     BenchmarkResult,
+    CrossValidatedModelResult,
     DatasetAnalysis,
     GenerationPlan,
     ModelMetrics,
@@ -12,6 +13,7 @@ from app.schemas.schemas import (
 __all__ = [
     "AgentLog",
     "BenchmarkResult",
+    "CrossValidatedModelResult",
     "DatasetAnalysis",
     "GenerationPlan",
     "ModelMetrics",

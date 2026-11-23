@@ -43,6 +43,32 @@ class LLMReasoner:
             logger.warning("Gemini explanation failed: %s", exc)
             return self._fallback(payload, task)
 
+    def explain_final_report(self, payload: dict[str, Any], fallback: str) -> str:
+        """Explain a selected result only; deterministic selection has already happened."""
+
+        if not self.enabled:
+            return fallback
+        try:
+            from google import genai
+
+            prompt = (
+                "You are the explanation layer of a synthetic-data platform. All values in the "
+                "JSON were computed deterministically. Do not calculate, change, invent, or round "
+                "metrics. Do not claim anonymity, formal privacy, compliance, or differential privacy. "
+                "Explain the selected result, rejected candidates, privacy limitations, and next actions "
+                "in short titled sections for a technical reader. If a fact is absent, say it is unavailable.\n"
+                f"JSON:\n{json.dumps(payload, default=str)[:12000]}"
+            )
+            response = genai.Client(api_key=self.api_key).models.generate_content(
+                model=self.model_name, contents=prompt
+            )
+            text = (getattr(response, "text", None) or "").strip()
+            # A missing or malformed response must never replace the deterministic report.
+            return text if len(text) >= 80 else fallback
+        except Exception as exc:
+            logger.warning("Gemini final report failed: %s", exc)
+            return fallback
+
     def _fallback(self, payload: dict[str, Any], task: str) -> str:
         if task == "analysis":
             issues = payload.get("issues") or []

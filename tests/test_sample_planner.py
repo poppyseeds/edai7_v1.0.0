@@ -6,11 +6,14 @@ from app.agents.planner import GenerationPlanner
 from app.agents.sample_planner import SamplePlanner
 from app.schemas.schemas import (
     BenchmarkResult,
+    CandidateEvaluation,
     GenerationPlan,
     ModelMetrics,
     OptimizationDecision,
     ValidationResult,
 )
+from app.pipeline.candidates import CandidateCache, propose_candidates
+from app.pipeline.selection import select_candidate
 
 
 def _labeled_counts(zeros: int, ones: int) -> pd.DataFrame:
@@ -22,7 +25,7 @@ def _labeled_counts(zeros: int, ones: int) -> pd.DataFrame:
     )
 
 
-def _validation(score: float = 0.5) -> ValidationResult:
+def _validation(score: float = 0.5, passed: bool = False) -> ValidationResult:
     return ValidationResult(
         fidelity_score=score,
         distribution_score=score,
@@ -30,7 +33,7 @@ def _validation(score: float = 0.5) -> ValidationResult:
         diversity_score=score,
         privacy_score=score,
         overall_score=score,
-        passed=False,
+        passed=passed,
     )
 
 
@@ -107,12 +110,13 @@ def test_healthy_large_dataset_can_skip_generation() -> None:
     assert decision.samples_to_generate == 0
 
 
-def test_optimizer_retries_same_generator_with_different_sample_count() -> None:
+def test_optimizer_uses_dataset_ranked_next_generator() -> None:
     plan = GenerationPlan(
         generator="ctgan",
         num_samples=2000,
         reason="test",
         original_rows=10000,
+        sample_count_details={"candidate_ranking": ["ctgan", "gaussian_copula", "tvae"]},
     )
     decision = OptimizationAgent().decide(
         iteration=1,
@@ -124,11 +128,11 @@ def test_optimizer_retries_same_generator_with_different_sample_count() -> None:
     )
     assert isinstance(decision, OptimizationDecision)
     assert decision.continue_loop is True
-    assert decision.next_generator == "ctgan"
-    assert decision.num_samples != 2000
+    assert decision.next_generator == "gaussian_copula"
+    assert decision.num_samples == 2000
 
 
-def test_optimizer_switches_generator_after_same_family_retry() -> None:
+def test_optimizer_follows_planner_ranking_not_fixed_family_order() -> None:
     plan = GenerationPlan(
         generator="ctgan",
         num_samples=25,
@@ -143,6 +147,7 @@ def test_optimizer_switches_generator_after_same_family_retry() -> None:
                 {"generator": "ctgan", "num_samples": 50},
                 {"generator": "ctgan", "num_samples": 25},
             ],
+            "candidate_ranking": ["ctgan", "gaussian_copula", "tvae"],
         },
     )
     decision = OptimizationAgent().decide(
@@ -153,13 +158,13 @@ def test_optimizer_switches_generator_after_same_family_retry() -> None:
         validation=_validation(0.4),
         tried_generators=["ctgan"],
     )
-    assert decision.next_generator == "tvae"
+    assert decision.next_generator == "gaussian_copula"
     assert decision.num_samples == 50
     assert plan.target_column == "target"
     assert plan.target_class == 1
 
 
-def test_optimizer_continues_search_after_a_passing_benchmark() -> None:
+def test_optimizer_stops_after_a_passing_benchmark() -> None:
     metrics = ModelMetrics(
         task_type="classification",
         model_name="random_forest",
@@ -183,12 +188,12 @@ def test_optimizer_continues_search_after_a_passing_benchmark() -> None:
             generator="gaussian_copula", num_samples=50, reason="test", original_rows=100
         ),
         benchmark=benchmark,
-        validation=_validation(0.8),
+        validation=_validation(0.8, passed=True),
         tried_generators=["gaussian_copula"],
     )
 
-    assert decision.continue_loop is True
-    assert decision.accept is False
+    assert decision.continue_loop is False
+    assert decision.accept is True
 
 
 def test_generation_planner_records_sample_count_details() -> None:
@@ -199,6 +204,36 @@ def test_generation_planner_records_sample_count_details() -> None:
     assert plan.current_target_count == 1000
     assert plan.desired_target_count == 2000
     assert plan.generation_mode == "minority_augmentation"
+    assert plan.sample_count_details["candidate_ranking"][0] == "gaussian_copula"
+    assert plan.sample_count_details["selection_policy"] == "dataset_aware_then_validation_early_stop"
+
+
+def test_generation_planner_ranks_ctgan_for_mixed_severely_imbalanced_data() -> None:
+    df = pd.DataFrame({
+        "amount": range(500),
+        "segment": ["a", "b"] * 250,
+        "target": [0] * 450 + [1] * 50,
+    })
+    analysis = DatasetAnalyzer().analyze(df, target_column="target")
+    plan = GenerationPlanner().plan(analysis)
+    assert plan.generator == "ctgan"
+    assert plan.sample_count_details["candidate_ranking"][0] == "ctgan"
+    assert "severe class imbalance" in plan.reason
+
+
+def test_generation_planner_ranks_by_dataset_shape_not_global_order() -> None:
+    numerical = pd.DataFrame({"x": range(200), "y": [value * 2.5 for value in range(200)]})
+    numerical_plan = GenerationPlanner().plan(DatasetAnalyzer().analyze(numerical))
+    assert numerical_plan.generator == "gaussian_copula"
+
+    categorical = pd.DataFrame({
+        "a": ["x", "y", "z"] * 700,
+        "b": ["m", "n"] * 1050,
+        "c": ["p", "q", "r", "s", "t"] * 420,
+    })
+    categorical_plan = GenerationPlanner().plan(DatasetAnalyzer().analyze(categorical))
+    assert categorical_plan.generator == "tvae"
+    assert categorical_plan.sample_count_details["candidate_ranking"] != numerical_plan.sample_count_details["candidate_ranking"]
 
 
 def test_generation_planner_applies_synthetic_ratio_to_non_minority_expansion() -> None:
@@ -207,3 +242,40 @@ def test_generation_planner_applies_synthetic_ratio_to_non_minority_expansion() 
     plan = GenerationPlanner().plan(analysis, synthetic_ratio=0.30)
     assert plan.num_samples == 60
     assert plan.sample_count_details["synthetic_ratio_applied"] is True
+
+
+def test_candidate_proposals_include_bootstrap_and_cache_isolated_values() -> None:
+    plan = GenerationPlan(
+        generator="ctgan", num_samples=40, reason="test", original_rows=100, max_allowed_samples=50
+    )
+    candidates = propose_candidates(plan)
+    cache = CandidateCache()
+    source = pd.DataFrame({"feature": [1, 2]})
+    key = candidates[0].cache_key(source, random_state=42, condition=None)
+    cache.put(key, source)
+    cached = cache.get(key)
+    assert "bootstrap" in {candidate.generator_name for candidate in candidates}
+    assert cached is not None
+    cached.loc[0, "feature"] = 99
+    assert cache.get(key).loc[0, "feature"] == 1
+
+
+def test_selection_rejects_high_utility_candidate_that_fails_privacy_gate() -> None:
+    unsafe = CandidateEvaluation(
+        candidate_id="unsafe", generator_name="bootstrap", requested_samples=10,
+        validity_score=1.0, distribution_score=1.0, dependency_score=1.0,
+        multivariate_score=1.0, diversity_score=1.0, discriminator_score=1.0,
+        privacy_score=0.10, exact_match_rate=0.8,
+    )
+    safe = CandidateEvaluation(
+        candidate_id="safe", generator_name="ctgan", requested_samples=10,
+        validity_score=1.0, distribution_score=0.8, dependency_score=0.8,
+        multivariate_score=0.8, diversity_score=0.8, discriminator_score=0.8,
+        privacy_score=0.9, exact_match_rate=0.0,
+    )
+
+    winner = select_candidate([unsafe, safe], "unlabeled")
+
+    assert winner is safe
+    assert "privacy_score_below_threshold" in unsafe.failed_gates
+    assert unsafe.selected is False

@@ -6,10 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.generators.bootstrap_generator import BootstrapGenerator
-from app.generators.copula_generator import GaussianCopulaGenerator
-from app.generators.ctgan_generator import CTGANGenerator
-from app.generators.tvae_generator import TVAEGenerator
+from app.generators.registry import create_generator, require_generator
+from app.config import get_settings
+from app.generators.runtime import MODEL_LOCK, resolve_device
 from app.schemas.schemas import GenerationPlan
 from app.utils.exceptions import GeneratorError
 from app.utils.logging_config import get_logger
@@ -25,21 +24,27 @@ MINORITY_MODES = {
 
 class GeneratorAgent:
     def __init__(self) -> None:
-        self._registry = {
-            "ctgan": CTGANGenerator(),
-            "tvae": TVAEGenerator(),
-            "gaussian_copula": GaussianCopulaGenerator(),
-        }
-
-        self._fallback = BootstrapGenerator()
+        # Retained as an injection seam for tests and local integrations.
+        self._registry = {}
+        self.last_metadata: dict = {}
 
     def generate(
+        self, df: pd.DataFrame, plan: GenerationPlan,
+        output_path: str | Path | None = None,
+    ) -> pd.DataFrame:
+        # Hold the lock through model creation, fit, sample, metadata capture and
+        # adapter release, so background jobs cannot fit two GPU models at once.
+        with MODEL_LOCK:
+            return self._generate(df, plan, output_path)
+
+    def _generate(
         self,
         df: pd.DataFrame,
         plan: GenerationPlan,
         output_path: str | Path | None = None,
     ) -> pd.DataFrame:
 
+        self.last_metadata = {}
         if not plan.generation_needed or plan.num_samples <= 0:
             logger.info(
                 "Generation not needed; returning empty synthetic dataframe."
@@ -56,12 +61,13 @@ class GeneratorAgent:
                 "Need at least 10 rows to fit a synthetic-data generator."
             )
 
-        generator = self._registry.get(plan.generator)
-
-        if generator is None:
-            raise GeneratorError(
-                f"Unknown generator '{plan.generator}'."
-            )
+        registration = require_generator(plan.generator, get_settings().enable_experimental_generators)
+        if "tabular" not in registration.capabilities.modalities:
+            raise GeneratorError(f"{plan.generator} does not support tabular inputs.")
+        if registration.capabilities.execution == "in_process":
+            resolve_device(plan.generator_config.device, registration.capabilities.supports_gpu,
+                           registration.capabilities.supports_cpu)
+        generator = self._registry.get(plan.generator) or create_generator(plan.generator, get_settings().enable_experimental_generators)
 
         # IMPORTANT:
         # Always train on the full real training dataframe.
@@ -96,38 +102,26 @@ class GeneratorAgent:
                 plan.num_samples,
             )
 
+        if condition_column and not registration.capabilities.supports_conditional_sampling:
+            raise GeneratorError(f"{plan.generator} does not support conditional sampling.")
+        resolved_config = plan.generator_config.model_copy(update={
+            "random_state": plan.random_state,
+            "epochs": plan.epochs if plan.epochs is not None else plan.generator_config.epochs,
+        })
         try:
-            synthetic = generator.generate(
-                df=df,
-                num_samples=plan.num_samples,
-                random_state=plan.random_state,
-                epochs=plan.epochs,
-                condition_column=condition_column,
-                condition_value=condition_value,
-            )
-
+            # All registered production adapters use the lifecycle contract. Legacy injected
+            # test doubles retain the original convenience signature.
+            if hasattr(generator, "fit") and hasattr(generator, "sample"):
+                synthetic = generator.generate(df, plan.num_samples, condition_column=condition_column,
+                    condition_value=condition_value, config=resolved_config)
+                self.last_metadata = generator.get_metadata()
+            else:
+                synthetic = generator.generate(df=df, num_samples=plan.num_samples,
+                    random_state=plan.random_state, epochs=plan.epochs,
+                    condition_column=condition_column, condition_value=condition_value)
+                self.last_metadata = {"generator": plan.generator, "injected_adapter": True}
         except Exception as exc:
-            logger.warning(
-                "%s failed: %s",
-                plan.generator,
-                exc,
-            )
-
-            # For conditional generation, fallback is also conditional.
-            # This prevents us from returning arbitrary classes.
-            try:
-                synthetic = self._fallback.generate(
-                    df=df,
-                    num_samples=plan.num_samples,
-                    random_state=plan.random_state,
-                    condition_column=condition_column,
-                    condition_value=condition_value,
-                )
-            except Exception as fallback_exc:
-                raise GeneratorError(
-                    f"{plan.generator} failed and bootstrap fallback "
-                    f"also failed: {fallback_exc}"
-                ) from fallback_exc
+            raise GeneratorError(f"{plan.generator} failed; no substitute model was used: {exc}") from exc
 
         synthetic = self._align_schema(
             df,

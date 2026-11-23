@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from app.config import get_settings
+from app.generators.base import GeneratorConfig
+from app.generators.registry import require_generator
+from app.generators.runtime import resolve_device
 from app.agents.sample_planner import SamplePlanner
+from app.agents.model_selector import rank_tabular_generators
 from app.schemas.schemas import DatasetAnalysis, GenerationPlan
 from app.utils.logging_config import get_logger
 
@@ -19,6 +23,7 @@ class GenerationPlanner:
         random_state: int | None = None,
         ctgan_epochs: int | None = None,
         tvae_epochs: int | None = None,
+        generator_config: GeneratorConfig | None = None,
     ) -> GenerationPlan:
         settings = get_settings()
         seed = random_state if random_state is not None else settings.random_state
@@ -48,37 +53,47 @@ class GenerationPlanner:
             }
         num_samples = sample_decision.samples_to_generate
         strategy = sample_decision.generation_mode
-        generator = "gaussian_copula"
         reason_parts: list[str] = []
 
         if analysis.class_distribution:
             if "severe_class_imbalance" in issues or "class_imbalance" in issues:
                 reason_parts.append("Class imbalance detected; planning targeted minority augmentation.")
 
+        cfg = generator_config or GeneratorConfig(random_state=seed)
         if preferred_generator:
-            generator = preferred_generator
-            reason_parts.append(f"Generator overridden to {generator}.")
-        elif "small_dataset" in issues:
-            generator = "gaussian_copula"
-            reason_parts.append("Small dataset: GaussianCopula is more stable than deep models.")
-        elif "severe_class_imbalance" in issues:
-            generator = "ctgan"
-            reason_parts.append("Severe class imbalance: CTGAN is preferred for mixed tabular data.")
-        elif "mixed_column_types" in issues:
-            generator = "ctgan"
-            reason_parts.append("Mixed numerical/categorical columns: CTGAN or TVAE is suitable.")
-        elif len(analysis.numerical_columns) >= len(analysis.categorical_columns):
-            generator = "gaussian_copula"
-            reason_parts.append("Mostly numerical data: GaussianCopula is a reasonable first attempt.")
-        else:
-            generator = "tvae"
-            reason_parts.append("Categorical-heavy table: TVAE is a reasonable first attempt.")
+            # Preserve precise unknown/unavailable/experimental errors before
+            # applying dataset compatibility ranking.
+            require_generator(preferred_generator, settings.enable_experimental_generators)
+        ranking = rank_tabular_generators(
+            analysis, strategy, cfg.device, settings.enable_experimental_generators,
+            preferred_generator=preferred_generator,
+        )
+        if not ranking:
+            raise ValueError("No available tabular generator supports this dataset and generation request.")
+        generator = ranking[0]["generator"]
+        ranking_names = [item["generator"] for item in ranking]
+        reason_parts.append(
+            f"Dataset-aware ranking selected {generator}; candidates: {', '.join(ranking_names)}."
+        )
+        if ranking[0]["reasons"]:
+            reason_parts.append("Top-model factors: " + "; ".join(ranking[0]["reasons"]) + ".")
+
+        registration = require_generator(generator, settings.enable_experimental_generators)
+        if registration.capabilities.execution == "in_process":
+            resolve_device(cfg.device, registration.capabilities.supports_gpu, registration.capabilities.supports_cpu)
+        allowed_options = registration.capabilities.configuration_options
+        if cfg.batch_size is not None and "batch_size" not in allowed_options:
+            raise ValueError(f"{generator} does not support batch_size.")
 
         epochs = None
         if generator == "ctgan":
             epochs = ctgan_epochs
         elif generator == "tvae":
             epochs = tvae_epochs
+        if cfg.epochs is not None:
+            if "epochs" not in allowed_options:
+                raise ValueError(f"{generator} does not support epochs.")
+            epochs = cfg.epochs
 
         if not reason_parts:
             reason_parts.append("Default generation strategy.")
@@ -105,8 +120,12 @@ class GenerationPlanner:
             sample_count_details={
                 **sample_decision.details,
                 "initial_sample_count": num_samples,
+                "candidate_ranking": ranking_names,
+                "candidate_scores": ranking,
+                "selection_policy": "dataset_aware_then_validation_early_stop",
             },
             epochs=epochs,
             random_state=seed,
             preserve_columns=list(analysis.column_names),
+            generator_config=cfg,
         )

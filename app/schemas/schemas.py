@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.generators.base import GeneratorConfig
 
 
 class DatasetAnalysis(BaseModel):
@@ -28,13 +29,14 @@ class DatasetAnalysis(BaseModel):
     categorical_distributions: dict[str, dict[str, float]]
     low_cardinality_columns: list[str]
     correlations: dict[str, dict[str, float]] = Field(default_factory=dict)
+    semantic_types: dict[str, dict[str, Any]] = Field(default_factory=dict)
     issues: list[str]
     issue_details: dict[str, str] = Field(default_factory=dict)
 
 
 class GenerationPlan(BaseModel):
-    generator: Literal["ctgan", "tvae", "gaussian_copula"]
-    num_samples: int
+    generator: str
+    num_samples: int = Field(ge=0)
     reason: str
     generation_needed: bool = True
     generation_mode: str = "dataset_expansion"
@@ -49,10 +51,19 @@ class GenerationPlan(BaseModel):
     max_allowed_samples: int | None = None
     sample_count_reason: str | None = None
     sample_count_details: dict[str, Any] = Field(default_factory=dict)
-    epochs: int | None = None
-    random_state: int = 42
+    epochs: int | None = Field(default=None, ge=1)
+    random_state: int = Field(default=42, ge=0, le=2**32 - 1)
     preserve_columns: list[str] = Field(default_factory=list)
     llm_explanation: str | None = None
+    generator_config: GeneratorConfig = Field(default_factory=GeneratorConfig)
+
+    @field_validator("generator")
+    @classmethod
+    def registered_generator(cls, value: str) -> str:
+        from app.generators.registry import GENERATOR_REGISTRY
+        if value not in GENERATOR_REGISTRY:
+            raise ValueError(f"Unknown generator '{value}'.")
+        return value
 
 
 class ValidationResult(BaseModel):
@@ -63,6 +74,7 @@ class ValidationResult(BaseModel):
     privacy_score: float
     overall_score: float
     passed: bool
+    constraint_score: float | None = None
     details: dict[str, Any] = Field(default_factory=dict)
     metric_notes: dict[str, str] = Field(default_factory=dict)
 
@@ -109,6 +121,46 @@ class BenchmarkResult(BaseModel):
     min_relative_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
     notes: str = ""
+    evaluation_role: Literal["validation", "final_test", "test"] = "test"
+
+
+class CrossValidatedModelResult(BaseModel):
+    model_name: str
+    primary_metric: str
+    mean_primary_value: float
+    std_primary_value: float
+    fold_primary_values: list[float] = Field(default_factory=list)
+
+
+class ModelSuiteResult(BaseModel):
+    task_type: str
+    primary_metric: str
+    folds: int
+    models: dict[str, CrossValidatedModelResult] = Field(default_factory=dict)
+    median_primary_value: float | None = None
+
+
+class CandidateEvaluation(BaseModel):
+    candidate_id: str
+    generator_name: str
+    hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    requested_samples: int
+    generated_samples: int = 0
+    validity_score: float | None = None
+    distribution_score: float | None = None
+    dependency_score: float | None = None
+    multivariate_score: float | None = None
+    diversity_score: float | None = None
+    discriminator_score: float | None = None
+    privacy_score: float | None = None
+    exact_match_rate: float | None = None
+    privacy_risk_level: str | None = None
+    downstream_cv: ModelSuiteResult | None = None
+    passed_hard_gates: bool = False
+    failed_gates: list[str] = Field(default_factory=list)
+    pareto_optimal: bool = False
+    selected: bool = False
+    failure_reason: str | None = None
 
 
 class OptimizationDecision(BaseModel):
@@ -141,6 +193,7 @@ class IterationRecord(BaseModel):
     decision: str = "retry"
     synthetic_rows: int
     synthetic_path: str | None = None
+    generator_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProvenanceFingerprint(BaseModel):
@@ -172,6 +225,7 @@ class PipelineResult(BaseModel):
     optimization_history: list[OptimizationDecision] = Field(default_factory=list)
     agent_logs: list[AgentLog] = Field(default_factory=list)
     llm_summaries: dict[str, str] = Field(default_factory=dict)
+    final_report: str = ""
     fairness: FairnessResult | None = None
     provenance: ProvenanceFingerprint | None = None
     final_evaluation: dict[str, Any] = Field(default_factory=dict)
@@ -179,18 +233,24 @@ class PipelineResult(BaseModel):
     improved: bool
     final_dataset_path: str | None = None
     best_iteration: int | None = None
+    final_benchmark: BenchmarkResult | None = None
+    planning_analysis: DatasetAnalysis | None = None
+    split_manifest: dict[str, Any] = Field(default_factory=dict)
+    artifact_eligible: bool = False
 
 
 class PipelineConfigModel(BaseModel):
-    max_iterations: int = 5
-    random_state: int = 42
-    synthetic_ratio: float = 0.3
-    ctgan_epochs: int | None = None
-    tvae_epochs: int = 10
+    max_iterations: int = Field(default=5, ge=1, le=50)
+    random_state: int = Field(default=42, ge=0, le=2**32 - 1)
+    synthetic_ratio: float | None = Field(default=None, ge=0)
+    ctgan_epochs: int | None = Field(default=None, ge=1)
+    tvae_epochs: int = Field(default=10, ge=1)
     min_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
-    test_size: float = 0.25
-    enable_llm: bool = True
+    test_size: float = Field(default=0.25, gt=0, lt=1)
+    validation_size: float = Field(default=0.25, gt=0, lt=1)
+    generator_config: GeneratorConfig = Field(default_factory=GeneratorConfig)
+    enable_llm: bool = False
     auto_detect_target: bool = False
     preferred_generator: str | None = None
     sensitive_column: str | None = None

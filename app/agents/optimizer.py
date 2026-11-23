@@ -14,10 +14,6 @@ from app.utils.logging_config import get_logger
 
 logger = get_logger("Optimizer")
 
-GENERATOR_CYCLE = ("ctgan", "tvae", "gaussian_copula")
-SAMPLE_COUNT_FACTORS = (0.50, 0.75, 1.00, 1.25)
-
-
 class OptimizationAgent:
     @staticmethod
     def _cap_sample_count(requested: int, original_rows: int) -> int:
@@ -31,21 +27,6 @@ class OptimizationAgent:
             return configured
         return current_plan.samples_to_generate or current_plan.num_samples
 
-    def _candidate_history(self, current_plan: GenerationPlan) -> list[tuple[str, int]]:
-        raw_history = current_plan.sample_count_details.get("candidate_history", [])
-        history: list[tuple[str, int]] = []
-        if isinstance(raw_history, list):
-            for item in raw_history:
-                if isinstance(item, dict):
-                    generator = item.get("generator")
-                    samples = item.get("num_samples")
-                    if isinstance(generator, str) and isinstance(samples, int):
-                        history.append((generator, samples))
-        current = (current_plan.generator, current_plan.num_samples)
-        if current not in history:
-            history.append(current)
-        return history
-
     def _next_candidate(
         self,
         current_plan: GenerationPlan,
@@ -53,33 +34,20 @@ class OptimizationAgent:
     ) -> tuple[str, int] | None:
         original_rows = current_plan.original_rows or current_plan.num_samples
         initial = self._initial_sample_count(current_plan)
-        history = self._candidate_history(current_plan)
-        tried_pairs = set(history)
-        current_attempts = [samples for generator, samples in history if generator == current_plan.generator]
-
-        if len(current_attempts) == 1:
-            for factor in SAMPLE_COUNT_FACTORS:
-                samples = self._cap_sample_count(int(round(initial * factor)), original_rows)
-                if samples != current_plan.num_samples and (current_plan.generator, samples) not in tried_pairs:
-                    return current_plan.generator, samples
-
-        attempted_generators = {generator for generator, _ in history} | set(tried_generators)
-        for generator in GENERATOR_CYCLE:
+        ranking = current_plan.sample_count_details.get("candidate_ranking", [current_plan.generator])
+        if not isinstance(ranking, list) or not all(isinstance(name, str) for name in ranking):
+            ranking = [current_plan.generator]
+        attempted_generators = set(tried_generators)
+        for generator in ranking:
             if generator not in attempted_generators:
                 return generator, self._cap_sample_count(initial, original_rows)
-
-        for factor in SAMPLE_COUNT_FACTORS:
-            samples = self._cap_sample_count(int(round(initial * factor)), original_rows)
-            candidate = (current_plan.generator, samples)
-            if candidate not in tried_pairs:
-                return candidate
         return None
 
     @staticmethod
     def _next_epochs(current_plan: GenerationPlan, next_generator: str) -> int | None:
         if next_generator in {"ctgan", "tvae"}:
             return max(current_plan.epochs or 10, 15)
-        return current_plan.epochs
+        return None
 
     def decide(
         self,
@@ -89,7 +57,18 @@ class OptimizationAgent:
         benchmark: BenchmarkResult | None,
         validation: ValidationResult,
         tried_generators: list[str],
+        hard_gate_failures: list[str] | None = None,
     ) -> OptimizationDecision:
+        failures = hard_gate_failures or []
+        if benchmark and benchmark.improved and validation.passed and not failures:
+            return OptimizationDecision(
+                continue_loop=False,
+                next_generator=None,
+                reason=(f"{current_plan.generator} passed validation quality, utility, and hard gates; "
+                        "stop the search before touching another model."),
+                iteration=iteration,
+                accept=True,
+            )
         if iteration >= max_iterations:
             return OptimizationDecision(
                 continue_loop=False,
@@ -140,7 +119,18 @@ class OptimizationAgent:
         validation: ValidationResult,
         utility: UnsupervisedUtilityResult,
         tried_generators: list[str],
+        hard_gate_failures: list[str] | None = None,
     ) -> OptimizationDecision:
+        failures = hard_gate_failures or []
+        if validation.passed and utility.passed and not failures:
+            return OptimizationDecision(
+                continue_loop=False,
+                next_generator=None,
+                reason=(f"{current_plan.generator} passed validation, unlabeled utility, and hard gates; "
+                        "stop the search before touching another model."),
+                iteration=iteration,
+                accept=True,
+            )
         if iteration >= max_iterations:
             return OptimizationDecision(
                 continue_loop=False,

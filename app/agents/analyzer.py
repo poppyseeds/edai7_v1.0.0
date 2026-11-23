@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from app.schemas.schemas import DatasetAnalysis
-from app.utils.data_utils import infer_column_types
+from app.utils.data_utils import infer_column_types, infer_semantic_types
 from app.utils.logging_config import get_logger
 
 logger = get_logger("Analyzer")
@@ -67,6 +67,7 @@ class DatasetAnalyzer:
             if n <= 12 and col != target
         ]
         correlations = self._correlations(df, numerical)
+        semantic_types = infer_semantic_types(df, target_column=target)
         issues, details = self._detect_issues(
             n_rows=n_rows,
             missing_percentage=missing_percentage,
@@ -103,6 +104,7 @@ class DatasetAnalyzer:
             categorical_distributions=categorical_distributions,
             low_cardinality_columns=low_cardinality,
             correlations=correlations,
+            semantic_types=semantic_types,
             issues=issues,
             issue_details=details,
         )
