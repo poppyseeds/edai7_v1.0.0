@@ -234,6 +234,7 @@ def sample_sdv(
     num_samples: int,
     condition_column: str | None = None,
     condition_value: object | None = None,
+    max_tries_per_batch: int = 1000,
 ) -> pd.DataFrame:
     """
     Sample from an SDV synthesizer.
@@ -283,7 +284,8 @@ def sample_sdv(
                 )
 
             synthetic = conditional_sampler(
-                conditions=[condition]
+                conditions=[condition],
+                max_tries_per_batch=max_tries_per_batch,
             )
 
     except GeneratorError:

@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+import json
+import platform
+import math
+from hashlib import sha256
+from importlib.metadata import version
 from pathlib import Path
 
 import pandas as pd
@@ -16,6 +21,8 @@ from app.agents.optimizer import OptimizationAgent
 from app.agents.planner import GenerationPlanner
 from app.agents.validator import ValidationAgent
 from app.config import get_settings
+from app.generators.base import GeneratorConfig
+from app.generators.registry import GENERATOR_REGISTRY
 from app.evaluation.fairness import group_performance
 from app.evaluation.unsupervised_utility import evaluate_unsupervised_utility
 from app.evaluation.watermark import provenance_fingerprint
@@ -44,12 +51,31 @@ class PipelineConfig:
     min_improvement: float | None = None
     min_absolute_improvement: float | None = None
     test_size: float | None = None
-    enable_llm: bool = True
+    enable_llm: bool = False
     auto_detect_target: bool = False
     preferred_generator: str | None = None
     sensitive_column: str | None = None
     output_dir: str | Path | None = None
     dataset_filename: str | None = None
+    validation_size: float = 0.25
+    generator_config: GeneratorConfig = field(default_factory=GeneratorConfig)
+
+    def __post_init__(self):
+        self.generator_config = GeneratorConfig.model_validate(self.generator_config)
+        for name in ("max_iterations", "ctgan_epochs", "tvae_epochs"):
+            value = getattr(self, name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+                raise ValueError(f"{name} must be a positive integer.")
+        if self.max_iterations is not None and self.max_iterations > 50:
+            raise ValueError("max_iterations must not exceed 50.")
+        if not 0 < self.validation_size < 1 or (self.test_size is not None and not 0 < self.test_size < 1):
+            raise ValueError("Split fractions must lie strictly between zero and one.")
+        if self.random_state is not None:
+            GeneratorConfig(random_state=self.random_state)
+        for name in ("synthetic_ratio", "min_improvement", "min_absolute_improvement"):
+            value = getattr(self, name)
+            if value is not None and (not math.isfinite(value) or value < 0):
+                raise ValueError(f"{name} must be finite and nonnegative.")
 
 
 @dataclass
@@ -59,27 +85,68 @@ class PipelineOutput:
     original_df: pd.DataFrame
     train_df: pd.DataFrame | None
     test_df: pd.DataFrame | None
+    validation_df: pd.DataFrame | None = None
 
 
-def run_pipeline(
+def run_pipeline(df: pd.DataFrame, target_column: str | None = None,
+                 config: PipelineConfig | None = None) -> PipelineOutput:
+    """Persist a local execution record even when fitting/evaluation raises."""
+    from dataclasses import asdict
+    cfg = config or PipelineConfig()
+    settings = get_settings()
+    directory = Path(cfg.output_dir or settings.generated_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    run_id = uuid.uuid4().hex[:12]
+    record_path = directory / f"{run_id}_manifest.json"
+    import torch
+    manifest = {
+        "schema_version": 1, "run_id": run_id, "status": "running", "started_at": utc_now(),
+        "requested_config": asdict(cfg),
+        "settings": settings.model_dump(exclude={"gemini_api_key"}),
+        "dataset_hash": sha256(df.to_csv(index=False).encode()).hexdigest(),
+        "environment": {"python": platform.python_version(), "platform": platform.platform(),
+            "packages": {name: version(name) for name in ("sdv", "torch", "pandas", "numpy", "scikit-learn")},
+            "cuda_available": torch.cuda.is_available(), "torch_cuda": torch.version.cuda},
+    }
+    def save_record():
+        temporary = record_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(manifest, indent=2,
+            default=lambda value: value.model_dump() if hasattr(value, "model_dump") else str(value)), encoding="utf-8")
+        temporary.replace(record_path)
+    save_record()
+    try:
+        output = _run_pipeline(df, target_column, cfg, run_id=run_id)
+        manifest.update(status="failed" if output.result.final_decision == "failed" else "completed",
+                        final_decision=output.result.final_decision, finished_at=utc_now(),
+                        result_path=str(directory / f"{run_id}_result.json"))
+        save_record()
+        return output
+    except Exception as exc:
+        manifest.update(status="failed", finished_at=utc_now(),
+                        failure={"type": type(exc).__name__, "message": str(exc)})
+        save_record()
+        exc.run_id = run_id
+        raise
+
+
+def _run_pipeline(
     df: pd.DataFrame,
     target_column: str | None = None,
     config: PipelineConfig | None = None,
+    *, run_id: str,
 ) -> PipelineOutput:
     setup_logging(get_settings().log_level)
     cfg = config or PipelineConfig()
     settings = get_settings()
-    max_iterations = cfg.max_iterations or settings.max_iterations
-    random_state = cfg.random_state if cfg.random_state is not None else settings.random_state
-    synthetic_ratio = (
-        cfg.synthetic_ratio if cfg.synthetic_ratio is not None else settings.default_synthetic_ratio
-    )
+    max_iterations = cfg.max_iterations if cfg.max_iterations is not None else settings.max_iterations
+    random_state = cfg.random_state if cfg.random_state is not None else (
+        cfg.generator_config.random_state if "random_state" in cfg.generator_config.model_fields_set else settings.random_state)
+    synthetic_ratio = cfg.synthetic_ratio if cfg.synthetic_ratio is not None else settings.default_synthetic_ratio
     ctgan_epochs = cfg.ctgan_epochs if cfg.ctgan_epochs is not None else settings.ctgan_epochs
     tvae_epochs = cfg.tvae_epochs if cfg.tvae_epochs is not None else settings.tvae_epochs
     output_dir = Path(cfg.output_dir or settings.generated_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    run_id = uuid.uuid4().hex[:12]
     logs: list[AgentLog] = []
 
     def log(agent: str, message: str) -> None:
@@ -121,30 +188,35 @@ def run_pipeline(
 
     train: pd.DataFrame | None = None
     test: pd.DataFrame | None = None
+    selection_data: pd.DataFrame | None = None
+    split_manifest: dict = {}
     baseline_metrics = None
+    planning_analysis = analysis
     if analysis.task_type:
-        train, test = benchmark_agent.split(
-            df,
-            target,
-            analysis.task_type,
-            test_size=cfg.test_size,
-            random_state=random_state,
-        )
+        split_manifest = benchmark_agent.research_split(df, target, analysis.task_type,
+            cfg.test_size if cfg.test_size is not None else settings.test_size,
+            cfg.validation_size, random_state)
+        train = df.iloc[split_manifest["train"]].reset_index(drop=True)
+        selection_data = df.iloc[split_manifest["validation"]].reset_index(drop=True)
+        test = df.iloc[split_manifest["test"]].reset_index(drop=True)
+        planning_analysis = analyzer.analyze(train, target_column=target)
+        if planning_analysis.task_type != analysis.task_type:
+            raise PipelineError("Target task inference changed after splitting; provide a dataset with a stable task definition.")
         baseline_metrics = benchmark_agent.evaluate_split(
-            train, test, target, analysis.task_type, random_state=random_state
-        )
-        log(
-            "Benchmark",
-            f"Baseline {baseline_metrics.primary_metric}: {baseline_metrics.primary_value:.4f}",
-        )
+            train, selection_data, target, planning_analysis.task_type, random_state=random_state)
+        split_manifest.update(random_state=random_state, validation_fraction_of_development=cfg.validation_size,
+                              role="row_positions_in_input", selection="validation_only")
+        (output_dir / f"{run_id}_splits.json").write_text(json.dumps(split_manifest, indent=2), encoding="utf-8")
+        log("Benchmark", "Created disjoint train/validation/final-test rows; candidate ranking uses validation only.")
 
     plan = planner.plan(
-        analysis,
+        planning_analysis,
         preferred_generator=cfg.preferred_generator,
         synthetic_ratio=synthetic_ratio,
         random_state=random_state,
         ctgan_epochs=ctgan_epochs,
         tvae_epochs=tvae_epochs,
+        generator_config=cfg.generator_config,
     )
     log("Planner", f"Dataset classified as {evaluation_mode}")
     log("Planner", f"Selected {plan.generator}: {plan.reason}")
@@ -184,6 +256,8 @@ def run_pipeline(
             optimization_history=[],
             agent_logs=logs,
             llm_summaries=llm_summaries,
+            planning_analysis=planning_analysis,
+            split_manifest=split_manifest,
             final_evaluation={
                 "evaluation_mode": evaluation_mode,
                 "generation_needed": False,
@@ -194,6 +268,7 @@ def run_pipeline(
             final_dataset_path=None,
             best_iteration=None,
         )
+        result.final_report = deterministic_final_report(build_final_report_payload(result))
         (output_dir / f"{run_id}_result.json").write_text(
             result.model_dump_json(indent=2), encoding="utf-8"
         )
@@ -203,12 +278,13 @@ def run_pipeline(
             original_df=df,
             train_df=train,
             test_df=test,
+            validation_df=selection_data,
         )
 
     for i in range(1, max_iterations + 1):
-        max_total_synthetic = int(analysis.rows * settings.max_total_synthetic_ratio)
+        max_total_synthetic = int(planning_analysis.rows * settings.max_total_synthetic_ratio)
         max_per_iteration = max(
-            1, int(analysis.rows * settings.max_generation_ratio_per_iteration)
+            1, int(planning_analysis.rows * settings.max_generation_ratio_per_iteration)
         )
         remaining_total = max_total_synthetic - cumulative_synthetic_rows
         if remaining_total <= 0:
@@ -259,16 +335,17 @@ def run_pipeline(
         bench = None
         utility = None
         iter_score = validation.overall_score
-        if train is not None and test is not None and analysis.task_type:
+        if train is not None and selection_data is not None and planning_analysis.task_type:
             bench = benchmark_agent.compare(
                 train=train,
-                test=test,
+                test=selection_data,
                 synthetic=synthetic,
                 target_column=target,
                 task_type=analysis.task_type,
                 random_state=random_state,
                 min_improvement=cfg.min_improvement,
                 min_absolute_improvement=cfg.min_absolute_improvement,
+                evaluation_role="validation",
             )
             log(
                 "Benchmark",
@@ -318,6 +395,7 @@ def run_pipeline(
             decision="pending",
             synthetic_rows=len(synthetic),
             synthetic_path=str(synth_path),
+            generator_metadata=generator_agent.last_metadata,
         )
         iterations.append(record)
         hard_gate_failures = _hard_gate_failures(validation)
@@ -346,6 +424,7 @@ def run_pipeline(
                 benchmark=bench,
                 validation=validation,
                 tried_generators=tried,
+                hard_gate_failures=hard_gate_failures,
             )
         else:
             decision = optimizer.decide_unlabeled(
@@ -355,6 +434,7 @@ def run_pipeline(
                 validation=validation,
                 utility=utility,
                 tried_generators=tried,
+                hard_gate_failures=hard_gate_failures,
             )
         decisions.append(decision)
         record.decision = "accepted" if decision.accept else ("retry" if decision.continue_loop else "stopped")
@@ -403,7 +483,29 @@ def run_pipeline(
             epochs=epochs,
             random_state=random_state,
             preserve_columns=plan.preserve_columns,
+            generator_config=GeneratorConfig(
+                random_state=random_state, device=cfg.generator_config.device,
+                batch_size=cfg.generator_config.batch_size if "batch_size" in GENERATOR_REGISTRY[decision.next_generator].capabilities.configuration_options else None,
+            ),
         )
+
+    if best_synth is None and fallback_synth is not None:
+        best_synth = fallback_synth
+        best_path = fallback_path
+        best_iter = fallback_iter
+        log(
+            "Selection",
+            "No candidate passed all hard gates; retaining the best rejected candidate for audit only.",
+        )
+
+    final_benchmark = None
+    if best_synth is not None and train is not None and test is not None:
+        final_benchmark = benchmark_agent.compare(train=train, test=test, synthetic=best_synth,
+            target_column=target, task_type=planning_analysis.task_type, random_state=random_state,
+            min_improvement=cfg.min_improvement, min_absolute_improvement=cfg.min_absolute_improvement,
+            evaluation_role="final_test")
+        baseline_metrics = final_benchmark.baseline
+        log("Benchmark", "Final-test evaluation completed after candidate selection; no further search is performed.")
 
     fairness = None
     if (
@@ -440,15 +542,6 @@ def run_pipeline(
         meta_path = output_dir / f"{run_id}_provenance.json"
         meta_path.write_text(provenance.model_dump_json(indent=2), encoding="utf-8")
 
-    if best_synth is None and fallback_synth is not None:
-        best_synth = fallback_synth
-        best_path = fallback_path
-        best_iter = fallback_iter
-        log(
-            "Selection",
-            "No candidate passed all hard gates; retaining the best rejected candidate for audit only.",
-        )
-
     best_record = None
     if best_iter is not None and iterations:
         best_record = next((rec for rec in iterations if rec.iteration == best_iter), iterations[-1])
@@ -456,6 +549,7 @@ def run_pipeline(
             improved = bool(
                 best_record.benchmark
                 and best_record.benchmark.improved
+                and final_benchmark and final_benchmark.improved
                 and best_record.validation.passed
                 and not _hard_gate_failures(best_record.validation)
             )
@@ -470,7 +564,7 @@ def run_pipeline(
         log(
             "Optimizer",
             (
-                "Selected the best candidate after evaluating the configured search budget."
+                "Selected the first dataset-ranked candidate that passed validation; final-test evaluation remained isolated."
                 if improved
                 else "Selected the highest-scoring candidate, but it did not meet every acceptance threshold."
             ),
@@ -488,7 +582,9 @@ def run_pipeline(
         final_evaluation = {
             "evaluation_mode": evaluation_mode,
             "validation": best_record.validation.model_dump(),
-            "benchmark": best_record.benchmark.model_dump() if best_record.benchmark else None,
+            "benchmark": final_benchmark.model_dump() if final_benchmark else None,
+            "selection_benchmark": best_record.benchmark.model_dump() if best_record.benchmark else None,
+            "selection_role": "validation" if target else "training_distribution_similarity",
             "unsupervised_utility": (
                 best_record.unsupervised_utility.model_dump()
                 if best_record.unsupervised_utility
@@ -509,6 +605,10 @@ def run_pipeline(
         agent_logs=logs,
         llm_summaries=llm_summaries,
         fairness=fairness,
+        final_benchmark=final_benchmark,
+        planning_analysis=planning_analysis,
+        split_manifest=split_manifest,
+        artifact_eligible=bool(best_record and best_record.validation.passed and not _hard_gate_failures(best_record.validation)),
         provenance=provenance,
         final_evaluation=final_evaluation,
         final_decision=final_decision,
@@ -532,6 +632,7 @@ def run_pipeline(
         original_df=df,
         train_df=train,
         test_df=test,
+        validation_df=selection_data,
     )
 
 
@@ -540,6 +641,8 @@ def _hard_gate_failures(validation) -> list[str]:
 
     settings = get_settings()
     failures: list[str] = []
+    if not validation.passed:
+        failures.append("overall_validation_below_threshold")
     privacy_details = validation.details.get("privacy", {})
     exact_rate = privacy_details.get("exact_duplicate_rate")
     if validation.privacy_score < settings.min_privacy_score:

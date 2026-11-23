@@ -120,6 +120,25 @@ class BenchmarkAgent:
             )
         return train.reset_index(drop=True), test.reset_index(drop=True)
 
+    def research_split(self, df: pd.DataFrame, target_column: str, task_type: str,
+                       test_size: float, validation_size: float, random_state: int):
+        """Return disjoint row positions; validation_size is a fraction of development rows."""
+        positions = np.arange(len(df))
+        labels = df[target_column] if task_type == "classification" else None
+        if df[target_column].isna().any():
+            raise BenchmarkError("Supervised targets contain missing values; choose an explicit cleaning policy.")
+        try:
+            development, test = train_test_split(positions, test_size=test_size,
+                random_state=random_state, stratify=labels)
+            train, valid = train_test_split(development, test_size=validation_size,
+                random_state=(random_state + 1) % 2**32,
+                stratify=df.iloc[development][target_column] if labels is not None else None)
+        except ValueError as exc:
+            raise BenchmarkError(f"Cannot create train/validation/test splits with this class population/configuration: {exc}") from exc
+        if len(train) < 10:
+            raise BenchmarkError("At least 10 original training rows are required after splitting.")
+        return {"train": train.tolist(), "validation": valid.tolist(), "test": test.tolist()}
+
     def evaluate_split(
         self,
         train: pd.DataFrame,
@@ -158,6 +177,7 @@ class BenchmarkAgent:
         random_state: int = 42,
         min_improvement: float | None = None,
         min_absolute_improvement: float | None = None,
+        evaluation_role: str = "test",
     ) -> BenchmarkResult:
         settings = get_settings()
         min_improvement = (
@@ -217,7 +237,7 @@ class BenchmarkAgent:
             f"Relative change in {baseline.primary_metric}: {rel:.4f}; "
             f"absolute change: {absolute:+.4f}. Acceptance requires at least "
             f"{min_improvement:.1%} relative and +{min_absolute_improvement:.4f} absolute improvement. "
-            "The test split contains held-out original rows only."
+            f"The {evaluation_role} split contains held-out original rows only."
         )
         return BenchmarkResult(
             baseline=baseline,
@@ -230,4 +250,5 @@ class BenchmarkAgent:
             min_relative_improvement=min_improvement,
             min_absolute_improvement=min_absolute_improvement,
             notes=note,
+            evaluation_role=evaluation_role,
         )

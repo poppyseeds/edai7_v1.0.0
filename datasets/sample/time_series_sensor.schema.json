@@ -1,0 +1,11 @@
+{
+  "timestamp": "timestamp",
+  "entity": "machine_id",
+  "features": ["temperature_c", "vibration_mm_s", "pressure_kpa"],
+  "context": ["machine_type"],
+  "sequence_length": 12,
+  "stride": 6,
+  "test_fraction": 0.2,
+  "validation_fraction": 0.2,
+  "missing_policy": "reject"
+}

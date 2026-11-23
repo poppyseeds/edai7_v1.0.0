@@ -1,0 +1,6649 @@
+{
+  "format": "project-structural-ast-v1",
+  "source_root": "app",
+  "module_count": 65,
+  "modules": [
+    {
+      "module": "app.__init__",
+      "path": "app/__init__.py",
+      "imports": [],
+      "internal_imports": [],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.agents.__init__",
+      "path": "app/agents/__init__.py",
+      "imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.optimizer.OptimizationAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.agents.validator.ValidationAgent"
+      ],
+      "internal_imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.optimizer.OptimizationAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.agents.validator.ValidationAgent"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.agents.analyzer",
+      "path": "app/agents/analyzer.py",
+      "imports": [
+        "__future__.annotations",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.data_utils.infer_semantic_types",
+        "app.utils.logging_config.get_logger",
+        "numpy",
+        "pandas",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.data_utils.infer_semantic_types",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "DatasetAnalyzer",
+          "line": 28,
+          "bases": [],
+          "methods": [
+            {
+              "name": "analyze",
+              "kind": "function",
+              "line": 29,
+              "arguments": [
+                "self",
+                "df",
+                "target_column",
+                "auto_detect_target"
+              ],
+              "calls": [
+                "DatasetAnalysis",
+                "ValueError",
+                "df.duplicated",
+                "df.isna",
+                "float",
+                "infer_column_types",
+                "infer_semantic_types",
+                "int",
+                "isna",
+                "items",
+                "list",
+                "logger.info",
+                "mean",
+                "missing_by_column.items",
+                "nunique",
+                "round",
+                "self._categorical_distributions",
+                "self._correlations",
+                "self._detect_issues",
+                "self._infer_task_type",
+                "self._numerical_stats",
+                "self._resolve_target",
+                "str",
+                "sum",
+                "unique_value_stats.items",
+                "value_counts"
+              ]
+            },
+            {
+              "name": "_resolve_target",
+              "kind": "function",
+              "line": 112,
+              "arguments": [
+                "self",
+                "df",
+                "target_column",
+                "auto_detect_target"
+              ],
+              "calls": [
+                "ValueError",
+                "c.lower",
+                "logger.info"
+              ]
+            },
+            {
+              "name": "_infer_task_type",
+              "kind": "function",
+              "line": 137,
+              "arguments": [
+                "self",
+                "series"
+              ],
+              "calls": [
+                "pd.api.types.is_numeric_dtype",
+                "series.nunique"
+              ]
+            },
+            {
+              "name": "_numerical_stats",
+              "kind": "function",
+              "line": 143,
+              "arguments": [
+                "self",
+                "df",
+                "numerical"
+              ],
+              "calls": [
+                "any",
+                "pd.to_numeric",
+                "s.max",
+                "s.mean",
+                "s.min",
+                "s.notna",
+                "s.skew",
+                "s.std",
+                "self._finite",
+                "sum"
+              ]
+            },
+            {
+              "name": "_finite",
+              "kind": "function",
+              "line": 159,
+              "arguments": [
+                "value"
+              ],
+              "calls": [
+                "float",
+                "np.isfinite"
+              ]
+            },
+            {
+              "name": "_categorical_distributions",
+              "kind": "function",
+              "line": 165,
+              "arguments": [
+                "self",
+                "df",
+                "categorical"
+              ],
+              "calls": [
+                "astype",
+                "float",
+                "head",
+                "str",
+                "value_counts",
+                "vc.items"
+              ]
+            },
+            {
+              "name": "_correlations",
+              "kind": "function",
+              "line": 174,
+              "arguments": [
+                "self",
+                "df",
+                "numerical"
+              ],
+              "calls": [
+                "corr",
+                "fillna",
+                "float",
+                "len",
+                "replace"
+              ]
+            },
+            {
+              "name": "_detect_issues",
+              "kind": "function",
+              "line": 185,
+              "arguments": [
+                "self",
+                "n_rows",
+                "missing_percentage",
+                "duplicate_percentage",
+                "task_type",
+                "class_distribution",
+                "unique_value_stats",
+                "numerical_stats",
+                "numerical",
+                "categorical"
+              ],
+              "calls": [
+                "abs",
+                "class_distribution.values",
+                "float",
+                "issues.append",
+                "join",
+                "len",
+                "max",
+                "min",
+                "np.mean",
+                "numerical_stats.items",
+                "st.get",
+                "unique_value_stats.items",
+                "unique_value_stats.values"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.benchmark",
+      "path": "app/agents/benchmark.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.evaluation.utility.primary_improvement",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.CrossValidatedModelResult",
+        "app.schemas.schemas.ModelMetrics",
+        "app.schemas.schemas.ModelSuiteResult",
+        "app.utils.exceptions.BenchmarkError",
+        "app.utils.logging_config.get_logger",
+        "numpy",
+        "pandas",
+        "sklearn.model_selection.KFold",
+        "sklearn.model_selection.StratifiedKFold",
+        "sklearn.model_selection.train_test_split"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.evaluation.utility.primary_improvement",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.CrossValidatedModelResult",
+        "app.schemas.schemas.ModelMetrics",
+        "app.schemas.schemas.ModelSuiteResult",
+        "app.utils.exceptions.BenchmarkError",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "BenchmarkAgent",
+          "line": 24,
+          "bases": [],
+          "methods": [
+            {
+              "name": "evaluate_model_suite_cv",
+              "kind": "function",
+              "line": 25,
+              "arguments": [
+                "self",
+                "train",
+                "target_column",
+                "task_type",
+                "random_state",
+                "folds"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "CrossValidatedModelResult",
+                "ModelSuiteResult",
+                "float",
+                "get_settings",
+                "np.mean",
+                "np.median",
+                "np.std",
+                "reset_index",
+                "results.values",
+                "round",
+                "self._make_cv_splitter",
+                "self.evaluate_split",
+                "splitter.split",
+                "values.append"
+              ]
+            },
+            {
+              "name": "_make_cv_splitter",
+              "kind": "function",
+              "line": 82,
+              "arguments": [
+                "target",
+                "task_type",
+                "folds",
+                "random_state"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "KFold",
+                "StratifiedKFold",
+                "int",
+                "len",
+                "min",
+                "target.value_counts"
+              ]
+            },
+            {
+              "name": "split",
+              "kind": "function",
+              "line": 98,
+              "arguments": [
+                "self",
+                "df",
+                "target_column",
+                "task_type",
+                "test_size",
+                "random_state"
+              ],
+              "calls": [
+                "get_settings",
+                "test.reset_index",
+                "train.reset_index",
+                "train_test_split"
+              ]
+            },
+            {
+              "name": "research_split",
+              "kind": "function",
+              "line": 123,
+              "arguments": [
+                "self",
+                "df",
+                "target_column",
+                "task_type",
+                "test_size",
+                "validation_size",
+                "random_state"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "any",
+                "isna",
+                "len",
+                "np.arange",
+                "test.tolist",
+                "train.tolist",
+                "train_test_split",
+                "valid.tolist"
+              ]
+            },
+            {
+              "name": "evaluate_split",
+              "kind": "function",
+              "line": 142,
+              "arguments": [
+                "self",
+                "train",
+                "test",
+                "target_column",
+                "task_type",
+                "random_state",
+                "model_name"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "DownstreamModel",
+                "len",
+                "model.evaluate",
+                "model.fit",
+                "test.drop",
+                "train.drop",
+                "y_test.astype",
+                "y_train.astype"
+              ]
+            },
+            {
+              "name": "compare",
+              "kind": "function",
+              "line": 170,
+              "arguments": [
+                "self",
+                "train",
+                "test",
+                "synthetic",
+                "target_column",
+                "task_type",
+                "random_state",
+                "min_improvement",
+                "min_absolute_improvement",
+                "evaluation_role"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "BenchmarkResult",
+                "aligned.drop",
+                "float",
+                "get_settings",
+                "getattr",
+                "improvement.get",
+                "logger.info",
+                "pd.concat",
+                "primary_improvement",
+                "self.evaluate_split",
+                "synthetic.copy"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.generator",
+      "path": "app/agents/generator.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.generators.registry.create_generator",
+        "app.generators.registry.require_generator",
+        "app.generators.runtime.MODEL_LOCK",
+        "app.generators.runtime.resolve_device",
+        "app.schemas.schemas.GenerationPlan",
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger",
+        "pandas",
+        "pathlib.Path"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.generators.registry.create_generator",
+        "app.generators.registry.require_generator",
+        "app.generators.runtime.MODEL_LOCK",
+        "app.generators.runtime.resolve_device",
+        "app.schemas.schemas.GenerationPlan",
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "GeneratorAgent",
+          "line": 25,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 26,
+              "arguments": [
+                "self"
+              ],
+              "calls": []
+            },
+            {
+              "name": "generate",
+              "kind": "function",
+              "line": 31,
+              "arguments": [
+                "self",
+                "df",
+                "plan",
+                "output_path"
+              ],
+              "calls": [
+                "self._generate"
+              ]
+            },
+            {
+              "name": "_generate",
+              "kind": "function",
+              "line": 40,
+              "arguments": [
+                "self",
+                "df",
+                "plan",
+                "output_path"
+              ],
+              "calls": [
+                "GeneratorError",
+                "Path",
+                "copy",
+                "create_generator",
+                "generator.generate",
+                "generator.get_metadata",
+                "get_settings",
+                "hasattr",
+                "len",
+                "logger.info",
+                "path.parent.mkdir",
+                "plan.generator_config.model_copy",
+                "require_generator",
+                "resolve_device",
+                "self._align_schema",
+                "self._registry.get",
+                "self._resolve_target_value",
+                "self._validate_condition",
+                "synthetic.reset_index",
+                "synthetic.to_csv"
+              ]
+            },
+            {
+              "name": "_resolve_target_value",
+              "kind": "function",
+              "line": 163,
+              "arguments": [
+                "series",
+                "requested_value"
+              ],
+              "calls": [
+                "GeneratorError",
+                "series.astype",
+                "str"
+              ]
+            },
+            {
+              "name": "_align_schema",
+              "kind": "function",
+              "line": 192,
+              "arguments": [
+                "original",
+                "synthetic"
+              ],
+              "calls": [
+                "GeneratorError",
+                "copy",
+                "out.reset_index",
+                "pd.api.types.is_numeric_dtype",
+                "pd.to_numeric"
+              ]
+            },
+            {
+              "name": "_validate_condition",
+              "kind": "function",
+              "line": 225,
+              "arguments": [
+                "synthetic",
+                "condition_column",
+                "condition_value"
+              ],
+              "calls": [
+                "GeneratorError",
+                "astype",
+                "matches.all",
+                "str",
+                "to_dict",
+                "value_counts"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.llm_reasoner",
+      "path": "app/agents/llm_reasoner.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.utils.logging_config.get_logger",
+        "json",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "LLMReasoner",
+          "line": 14,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 15,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "bool",
+                "get_settings"
+              ]
+            },
+            {
+              "name": "explain",
+              "kind": "function",
+              "line": 21,
+              "arguments": [
+                "self",
+                "payload",
+                "task"
+              ],
+              "calls": [
+                "client.models.generate_content",
+                "genai.Client",
+                "getattr",
+                "json.dumps",
+                "logger.warning",
+                "self._fallback",
+                "str",
+                "text.strip"
+              ]
+            },
+            {
+              "name": "explain_final_report",
+              "kind": "function",
+              "line": 46,
+              "arguments": [
+                "self",
+                "payload",
+                "fallback"
+              ],
+              "calls": [
+                "genai.Client",
+                "getattr",
+                "json.dumps",
+                "len",
+                "logger.warning",
+                "models.generate_content",
+                "strip"
+              ]
+            },
+            {
+              "name": "_fallback",
+              "kind": "function",
+              "line": 72,
+              "arguments": [
+                "self",
+                "payload",
+                "task"
+              ],
+              "calls": [
+                "join",
+                "payload.get"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.model_selector",
+      "path": "app/agents/model_selector.py",
+      "imports": [
+        "__future__.annotations",
+        "app.generators.registry.get_available_generators",
+        "app.schemas.schemas.DatasetAnalysis",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.generators.registry.get_available_generators",
+        "app.schemas.schemas.DatasetAnalysis"
+      ],
+      "functions": [
+        {
+          "name": "rank_tabular_generators",
+          "kind": "function",
+          "line": 19,
+          "arguments": [
+            "analysis",
+            "generation_mode",
+            "device",
+            "include_experimental",
+            "preferred_generator"
+          ],
+          "calls": [
+            "BASE_SCORES.get",
+            "adjust",
+            "eligible.append",
+            "get",
+            "get_available_generators",
+            "len",
+            "next",
+            "ranked.append",
+            "ranked.sort",
+            "reasons.append",
+            "round",
+            "set",
+            "statuses.items"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.agents.optimizer",
+      "path": "app/agents/optimizer.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.OptimizationDecision",
+        "app.schemas.schemas.UnsupervisedUtilityResult",
+        "app.schemas.schemas.ValidationResult",
+        "app.utils.logging_config.get_logger"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.OptimizationDecision",
+        "app.schemas.schemas.UnsupervisedUtilityResult",
+        "app.schemas.schemas.ValidationResult",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "OptimizationAgent",
+          "line": 17,
+          "bases": [],
+          "methods": [
+            {
+              "name": "_cap_sample_count",
+              "kind": "function",
+              "line": 19,
+              "arguments": [
+                "requested",
+                "original_rows"
+              ],
+              "calls": [
+                "get_settings",
+                "int",
+                "max",
+                "min"
+              ]
+            },
+            {
+              "name": "_initial_sample_count",
+              "kind": "function",
+              "line": 24,
+              "arguments": [
+                "self",
+                "current_plan"
+              ],
+              "calls": [
+                "current_plan.sample_count_details.get",
+                "isinstance"
+              ]
+            },
+            {
+              "name": "_next_candidate",
+              "kind": "function",
+              "line": 30,
+              "arguments": [
+                "self",
+                "current_plan",
+                "tried_generators"
+              ],
+              "calls": [
+                "all",
+                "current_plan.sample_count_details.get",
+                "isinstance",
+                "self._cap_sample_count",
+                "self._initial_sample_count",
+                "set"
+              ]
+            },
+            {
+              "name": "_next_epochs",
+              "kind": "function",
+              "line": 47,
+              "arguments": [
+                "current_plan",
+                "next_generator"
+              ],
+              "calls": [
+                "max"
+              ]
+            },
+            {
+              "name": "decide",
+              "kind": "function",
+              "line": 52,
+              "arguments": [
+                "self",
+                "iteration",
+                "max_iterations",
+                "current_plan",
+                "benchmark",
+                "validation",
+                "tried_generators",
+                "hard_gate_failures"
+              ],
+              "calls": [
+                "OptimizationDecision",
+                "benchmark.improvement.get",
+                "logger.info",
+                "self._next_candidate",
+                "self._next_epochs"
+              ]
+            },
+            {
+              "name": "decide_unlabeled",
+              "kind": "function",
+              "line": 114,
+              "arguments": [
+                "self",
+                "iteration",
+                "max_iterations",
+                "current_plan",
+                "validation",
+                "utility",
+                "tried_generators",
+                "hard_gate_failures"
+              ],
+              "calls": [
+                "OptimizationDecision",
+                "logger.info",
+                "self._next_candidate",
+                "self._next_epochs"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.planner",
+      "path": "app/agents/planner.py",
+      "imports": [
+        "__future__.annotations",
+        "app.agents.model_selector.rank_tabular_generators",
+        "app.agents.sample_planner.SamplePlanner",
+        "app.config.get_settings",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.require_generator",
+        "app.generators.runtime.resolve_device",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.schemas.schemas.GenerationPlan",
+        "app.utils.logging_config.get_logger"
+      ],
+      "internal_imports": [
+        "app.agents.model_selector.rank_tabular_generators",
+        "app.agents.sample_planner.SamplePlanner",
+        "app.config.get_settings",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.require_generator",
+        "app.generators.runtime.resolve_device",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.schemas.schemas.GenerationPlan",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "GenerationPlanner",
+          "line": 17,
+          "bases": [],
+          "methods": [
+            {
+              "name": "plan",
+              "kind": "function",
+              "line": 18,
+              "arguments": [
+                "self",
+                "analysis",
+                "preferred_generator",
+                "synthetic_ratio",
+                "random_state",
+                "ctgan_epochs",
+                "tvae_epochs",
+                "generator_config"
+              ],
+              "calls": [
+                "GenerationPlan",
+                "GeneratorConfig",
+                "SamplePlanner",
+                "ValueError",
+                "cap_samples",
+                "get_settings",
+                "int",
+                "join",
+                "list",
+                "logger.info",
+                "max",
+                "plan",
+                "rank_tabular_generators",
+                "reason_parts.append",
+                "require_generator",
+                "resolve_device",
+                "round",
+                "set"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.sample_planner",
+      "path": "app/agents/sample_planner.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.utils.logging_config.get_logger",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "math"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "SampleCountDecision",
+          "line": 20,
+          "bases": [],
+          "methods": []
+        },
+        {
+          "name": "SamplePlanner",
+          "line": 34,
+          "bases": [],
+          "methods": [
+            {
+              "name": "plan",
+              "kind": "function",
+              "line": 35,
+              "arguments": [
+                "self",
+                "analysis"
+              ],
+              "calls": [
+                "self._plan_labeled",
+                "self._plan_unlabeled"
+              ]
+            },
+            {
+              "name": "cap_samples",
+              "kind": "function",
+              "line": 40,
+              "arguments": [
+                "self",
+                "requested",
+                "original_rows"
+              ],
+              "calls": [
+                "get_settings",
+                "int",
+                "logger.info",
+                "max",
+                "min"
+              ]
+            },
+            {
+              "name": "_plan_labeled",
+              "kind": "function",
+              "line": 52,
+              "arguments": [
+                "self",
+                "analysis"
+              ],
+              "calls": [
+                "SampleCountDecision",
+                "counts.items",
+                "get_settings",
+                "int",
+                "items",
+                "logger.info",
+                "math.ceil",
+                "max",
+                "min",
+                "round",
+                "self._small_or_skip",
+                "self.cap_samples",
+                "set",
+                "str"
+              ]
+            },
+            {
+              "name": "_plan_unlabeled",
+              "kind": "function",
+              "line": 117,
+              "arguments": [
+                "self",
+                "analysis"
+              ],
+              "calls": [
+                "self._small_or_skip"
+              ]
+            },
+            {
+              "name": "_small_or_skip",
+              "kind": "function",
+              "line": 120,
+              "arguments": [
+                "self",
+                "analysis",
+                "labeled"
+              ],
+              "calls": [
+                "SampleCountDecision",
+                "get_settings",
+                "int",
+                "logger.info",
+                "round",
+                "self.cap_samples",
+                "set"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.agents.validator",
+      "path": "app/agents/validator.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.evaluation.advanced_similarity.dependency_similarity",
+        "app.evaluation.advanced_similarity.discriminator_ensemble",
+        "app.evaluation.advanced_similarity.mmd_similarity",
+        "app.evaluation.constraints.discover_constraints",
+        "app.evaluation.constraints.validate_constraints",
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_details",
+        "app.evaluation.fidelity.distribution_score",
+        "app.evaluation.fidelity.fidelity_score",
+        "app.evaluation.privacy.basic_privacy_indicators",
+        "app.schemas.schemas.ValidationResult",
+        "app.utils.logging_config.get_logger",
+        "pandas"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.evaluation.advanced_similarity.dependency_similarity",
+        "app.evaluation.advanced_similarity.discriminator_ensemble",
+        "app.evaluation.advanced_similarity.mmd_similarity",
+        "app.evaluation.constraints.discover_constraints",
+        "app.evaluation.constraints.validate_constraints",
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_details",
+        "app.evaluation.fidelity.distribution_score",
+        "app.evaluation.fidelity.fidelity_score",
+        "app.evaluation.privacy.basic_privacy_indicators",
+        "app.schemas.schemas.ValidationResult",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "ValidationAgent",
+          "line": 36,
+          "bases": [],
+          "methods": [
+            {
+              "name": "validate",
+              "kind": "function",
+              "line": 37,
+              "arguments": [
+                "self",
+                "original",
+                "synthetic",
+                "random_state"
+              ],
+              "calls": [
+                "ValidationResult",
+                "ValueError",
+                "basic_privacy_indicators",
+                "correlation_score",
+                "dependency_similarity",
+                "discover_constraints",
+                "discriminator_ensemble",
+                "distribution_details",
+                "distribution_score",
+                "diversity_score",
+                "fidelity_score",
+                "float",
+                "get_settings",
+                "logger.info",
+                "mmd_similarity",
+                "round",
+                "validate_constraints"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.api.__init__",
+      "path": "app/api/__init__.py",
+      "imports": [
+        "app.api.main.app"
+      ],
+      "internal_imports": [
+        "app.api.main.app"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.api.main",
+      "path": "app/api/main.py",
+      "imports": [
+        "__future__.annotations",
+        "app.__version__",
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.config.get_settings",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.get_available_generators",
+        "app.pipeline.orchestrator.PipelineConfig",
+        "app.pipeline.orchestrator.run_pipeline",
+        "app.research.config.ExperimentConfig",
+        "app.research.engine.submit_experiment",
+        "app.research.planner.model_inventory",
+        "app.research.store.ExperimentStore",
+        "app.timeseries.data.TimeSeriesSchema",
+        "app.timeseries.data.prepare_sequences",
+        "app.timeseries.generators.SEQUENCE_GENERATORS",
+        "app.timeseries.generators.SequenceConfig",
+        "app.utils.data_utils.create_sample_churn_dataset",
+        "app.utils.data_utils.create_sample_timeseries_dataset",
+        "app.utils.data_utils.create_unlabeled_customer_dataset",
+        "app.utils.data_utils.load_csv_bytes",
+        "app.utils.data_utils.save_csv",
+        "app.utils.exceptions.InvalidDatasetError",
+        "app.utils.exceptions.SyntheticAIError",
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging",
+        "fastapi.FastAPI",
+        "fastapi.File",
+        "fastapi.Form",
+        "fastapi.HTTPException",
+        "fastapi.UploadFile",
+        "fastapi.encoders.jsonable_encoder",
+        "fastapi.middleware.cors.CORSMiddleware",
+        "fastapi.responses.FileResponse",
+        "fastapi.responses.JSONResponse",
+        "json",
+        "pandas",
+        "pathlib.Path",
+        "threading.Thread",
+        "typing.Any",
+        "typing.Literal",
+        "uuid.uuid4"
+      ],
+      "internal_imports": [
+        "app.__version__",
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.config.get_settings",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.get_available_generators",
+        "app.pipeline.orchestrator.PipelineConfig",
+        "app.pipeline.orchestrator.run_pipeline",
+        "app.research.config.ExperimentConfig",
+        "app.research.engine.submit_experiment",
+        "app.research.planner.model_inventory",
+        "app.research.store.ExperimentStore",
+        "app.timeseries.data.TimeSeriesSchema",
+        "app.timeseries.data.prepare_sequences",
+        "app.timeseries.generators.SEQUENCE_GENERATORS",
+        "app.timeseries.generators.SequenceConfig",
+        "app.utils.data_utils.create_sample_churn_dataset",
+        "app.utils.data_utils.create_sample_timeseries_dataset",
+        "app.utils.data_utils.create_unlabeled_customer_dataset",
+        "app.utils.data_utils.load_csv_bytes",
+        "app.utils.data_utils.save_csv",
+        "app.utils.exceptions.InvalidDatasetError",
+        "app.utils.exceptions.SyntheticAIError",
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging"
+      ],
+      "functions": [
+        {
+          "name": "_target_options",
+          "kind": "function",
+          "line": 62,
+          "arguments": [
+            "target_column"
+          ],
+          "calls": []
+        },
+        {
+          "name": "_read_upload",
+          "kind": "function",
+          "line": 70,
+          "arguments": [
+            "file",
+            "min_rows"
+          ],
+          "calls": [
+            "HTTPException",
+            "Path",
+            "any",
+            "dest.open",
+            "dest.resolve",
+            "endswith",
+            "file.file.read",
+            "file.filename.lower",
+            "get_settings",
+            "len",
+            "load_csv_bytes",
+            "ord",
+            "output.write",
+            "resolve",
+            "str",
+            "upload_root.mkdir",
+            "uuid4",
+            "validate_dataframe"
+          ]
+        },
+        {
+          "name": "_preview_records",
+          "kind": "function",
+          "line": 99,
+          "arguments": [
+            "df",
+            "rows"
+          ],
+          "calls": [
+            "astype",
+            "df.head",
+            "jsonable_encoder",
+            "pd.notna",
+            "preview.to_dict",
+            "where"
+          ]
+        },
+        {
+          "name": "_column_list",
+          "kind": "function",
+          "line": 106,
+          "arguments": [
+            "value"
+          ],
+          "calls": [
+            "all",
+            "isinstance",
+            "item.strip",
+            "json.loads",
+            "value.split",
+            "value.strip"
+          ]
+        },
+        {
+          "name": "_time_series_schema",
+          "kind": "function",
+          "line": 118,
+          "arguments": [
+            "timestamp_column",
+            "feature_columns",
+            "entity_column",
+            "context_columns",
+            "sequence_length",
+            "stride",
+            "missing_policy"
+          ],
+          "calls": [
+            "TimeSeriesSchema",
+            "ValueError",
+            "_column_list"
+          ]
+        },
+        {
+          "name": "_temporal_job_payload",
+          "kind": "function",
+          "line": 143,
+          "arguments": [
+            "identifier",
+            "filename"
+          ],
+          "calls": [
+            "EXPERIMENT_STORE.get",
+            "failure.get",
+            "get",
+            "record.get"
+          ]
+        },
+        {
+          "name": "root",
+          "kind": "function",
+          "line": 164,
+          "arguments": [],
+          "calls": [
+            "app.get"
+          ]
+        },
+        {
+          "name": "health",
+          "kind": "function",
+          "line": 174,
+          "arguments": [],
+          "calls": [
+            "app.get"
+          ]
+        },
+        {
+          "name": "generators",
+          "kind": "function",
+          "line": 179,
+          "arguments": [],
+          "calls": [
+            "app.get",
+            "get_available_generators",
+            "get_settings"
+          ]
+        },
+        {
+          "name": "research_models",
+          "kind": "function",
+          "line": 186,
+          "arguments": [
+            "probe_hardware"
+          ],
+          "calls": [
+            "app.get",
+            "model_inventory"
+          ]
+        },
+        {
+          "name": "experiments",
+          "kind": "function",
+          "line": 192,
+          "arguments": [
+            "limit"
+          ],
+          "calls": [
+            "EXPERIMENT_STORE.list",
+            "app.get"
+          ]
+        },
+        {
+          "name": "experiment",
+          "kind": "function",
+          "line": 197,
+          "arguments": [
+            "experiment_id"
+          ],
+          "calls": [
+            "EXPERIMENT_STORE.get",
+            "HTTPException",
+            "app.get"
+          ]
+        },
+        {
+          "name": "list_samples",
+          "kind": "function",
+          "line": 205,
+          "arguments": [],
+          "calls": [
+            "app.get"
+          ]
+        },
+        {
+          "name": "download_sample",
+          "kind": "function",
+          "line": 216,
+          "arguments": [
+            "sample_id"
+          ],
+          "calls": [
+            "FileResponse",
+            "HTTPException",
+            "app.get",
+            "create_sample_churn_dataset",
+            "create_sample_timeseries_dataset",
+            "create_unlabeled_customer_dataset",
+            "path.exists",
+            "sample_paths.get"
+          ]
+        },
+        {
+          "name": "profile_time_series",
+          "kind": "async_function",
+          "line": 236,
+          "arguments": [
+            "file",
+            "timestamp_column",
+            "feature_columns",
+            "entity_column",
+            "context_columns",
+            "sequence_length",
+            "stride",
+            "missing_policy"
+          ],
+          "calls": [
+            "File",
+            "Form",
+            "HTTPException",
+            "_preview_records",
+            "_read_upload",
+            "_time_series_schema",
+            "app.post",
+            "list",
+            "prepare_sequences",
+            "prepared.windows.items",
+            "schema.model_dump",
+            "str"
+          ]
+        },
+        {
+          "name": "analyze",
+          "kind": "async_function",
+          "line": 264,
+          "arguments": [
+            "file",
+            "target_column",
+            "auto_detect_target"
+          ],
+          "calls": [
+            "DatasetAnalyzer",
+            "File",
+            "Form",
+            "HTTPException",
+            "_preview_records",
+            "_read_upload",
+            "_target_options",
+            "analyze",
+            "app.post",
+            "result.model_dump",
+            "str"
+          ]
+        },
+        {
+          "name": "generate",
+          "kind": "async_function",
+          "line": 287,
+          "arguments": [
+            "file",
+            "target_column",
+            "generator",
+            "num_samples",
+            "auto_detect_target",
+            "device",
+            "batch_size",
+            "epochs",
+            "random_state"
+          ],
+          "calls": [
+            "DatasetAnalyzer",
+            "File",
+            "Form",
+            "GenerationPlanner",
+            "GeneratorAgent",
+            "GeneratorConfig",
+            "HTTPException",
+            "Path",
+            "_preview_records",
+            "_read_upload",
+            "_target_options",
+            "analyzer.analyze",
+            "app.post",
+            "generate",
+            "get_settings",
+            "len",
+            "plan",
+            "plan.model_dump",
+            "str",
+            "uuid4"
+          ]
+        },
+        {
+          "name": "plan_generation",
+          "kind": "async_function",
+          "line": 330,
+          "arguments": [
+            "file",
+            "target_column",
+            "generator",
+            "auto_detect_target",
+            "device",
+            "batch_size",
+            "epochs",
+            "random_state"
+          ],
+          "calls": [
+            "DatasetAnalyzer",
+            "File",
+            "Form",
+            "GenerationPlanner",
+            "GeneratorConfig",
+            "HTTPException",
+            "_preview_records",
+            "_read_upload",
+            "_target_options",
+            "analysis.model_dump",
+            "analyze",
+            "app.post",
+            "logger.exception",
+            "plan",
+            "plan.model_dump",
+            "str"
+          ]
+        },
+        {
+          "name": "run",
+          "kind": "async_function",
+          "line": 366,
+          "arguments": [
+            "file",
+            "target_column",
+            "max_iterations",
+            "sensitive_column",
+            "preferred_generator",
+            "enable_llm",
+            "auto_detect_target",
+            "device",
+            "batch_size",
+            "epochs",
+            "random_state",
+            "test_size",
+            "validation_size"
+          ],
+          "calls": [
+            "File",
+            "Form",
+            "GeneratorConfig",
+            "HTTPException",
+            "PipelineConfig",
+            "_preview_records",
+            "_read_upload",
+            "_target_options",
+            "app.post",
+            "output.result.model_dump",
+            "run_pipeline",
+            "str"
+          ]
+        },
+        {
+          "name": "start_pipeline_run",
+          "kind": "async_function",
+          "line": 414,
+          "arguments": [
+            "file",
+            "modality",
+            "target_column",
+            "max_iterations",
+            "sensitive_column",
+            "preferred_generator",
+            "enable_llm",
+            "auto_detect_target",
+            "device",
+            "batch_size",
+            "epochs",
+            "random_state",
+            "test_size",
+            "validation_size",
+            "timestamp_column",
+            "entity_column",
+            "feature_columns",
+            "context_columns",
+            "sequence_length",
+            "stride",
+            "missing_policy",
+            "num_sequences",
+            "temporal_epochs",
+            "temporal_batch_size",
+            "hidden_dim",
+            "layers",
+            "heads",
+            "timesteps",
+            "sampling_steps",
+            "forecast_target",
+            "forecast_horizon"
+          ],
+          "calls": [
+            "ExperimentConfig",
+            "File",
+            "Form",
+            "GeneratorConfig",
+            "HTTPException",
+            "PipelineConfig",
+            "SequenceConfig",
+            "Thread",
+            "ValueError",
+            "_preview_records",
+            "_read_upload",
+            "_target_options",
+            "_temporal_job_payload",
+            "_time_series_schema",
+            "app.post",
+            "dict",
+            "get",
+            "getattr",
+            "model_inventory",
+            "output.result.model_dump",
+            "prepare_sequences",
+            "run_pipeline",
+            "start",
+            "status.get",
+            "str",
+            "submit_experiment",
+            "update",
+            "uuid4"
+          ]
+        },
+        {
+          "name": "get_pipeline_run",
+          "kind": "function",
+          "line": 550,
+          "arguments": [
+            "job_id"
+          ],
+          "calls": [
+            "EXPERIMENT_STORE.get",
+            "HTTPException",
+            "PIPELINE_JOBS.get",
+            "_temporal_job_payload",
+            "app.get",
+            "get",
+            "job.get",
+            "record.get"
+          ]
+        },
+        {
+          "name": "download_experiment_synthetic",
+          "kind": "function",
+          "line": 566,
+          "arguments": [
+            "experiment_id"
+          ],
+          "calls": [
+            "EXPERIMENT_STORE.directory",
+            "EXPERIMENT_STORE.get",
+            "FileResponse",
+            "HTTPException",
+            "app.get",
+            "exists"
+          ]
+        },
+        {
+          "name": "get_run",
+          "kind": "function",
+          "line": 579,
+          "arguments": [
+            "run_id"
+          ],
+          "calls": [
+            "HTTPException",
+            "JSONResponse",
+            "Path",
+            "__import__",
+            "app.get",
+            "get_settings",
+            "loads",
+            "model_dump",
+            "path.exists",
+            "path.read_text"
+          ]
+        },
+        {
+          "name": "download_synthetic",
+          "kind": "function",
+          "line": 590,
+          "arguments": [
+            "run_id"
+          ],
+          "calls": [
+            "FileResponse",
+            "HTTPException",
+            "Path",
+            "app.get",
+            "data.get",
+            "exists",
+            "get_settings",
+            "json.loads",
+            "save_csv",
+            "stored.exists",
+            "stored.read_text"
+          ]
+        },
+        {
+          "name": "get_run_manifest",
+          "kind": "function",
+          "line": 615,
+          "arguments": [
+            "run_id"
+          ],
+          "calls": [
+            "HTTPException",
+            "Path",
+            "app.get",
+            "get_settings",
+            "json.loads",
+            "path.exists",
+            "path.read_text",
+            "re.fullmatch"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.config",
+      "path": "app/config.py",
+      "imports": [
+        "__future__.annotations",
+        "pydantic.Field",
+        "pydantic_settings.BaseSettings",
+        "pydantic_settings.SettingsConfigDict"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "get_settings",
+          "kind": "function",
+          "line": 61,
+          "arguments": [],
+          "calls": [
+            "Settings"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "Settings",
+          "line": 9,
+          "bases": [
+            "BaseSettings"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.evaluation.__init__",
+      "path": "app/evaluation/__init__.py",
+      "imports": [
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fairness.group_performance",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_score",
+        "app.evaluation.fidelity.fidelity_score",
+        "app.evaluation.privacy.basic_privacy_indicators",
+        "app.evaluation.utility.primary_improvement",
+        "app.evaluation.watermark.provenance_fingerprint"
+      ],
+      "internal_imports": [
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fairness.group_performance",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_score",
+        "app.evaluation.fidelity.fidelity_score",
+        "app.evaluation.privacy.basic_privacy_indicators",
+        "app.evaluation.utility.primary_improvement",
+        "app.evaluation.watermark.provenance_fingerprint"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.advanced_similarity",
+      "path": "app/evaluation/advanced_similarity.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.utils.data_utils.infer_column_types",
+        "numpy",
+        "pandas",
+        "scipy.stats.spearmanr",
+        "sklearn.compose.ColumnTransformer",
+        "sklearn.ensemble.HistGradientBoostingClassifier",
+        "sklearn.ensemble.RandomForestClassifier",
+        "sklearn.impute.SimpleImputer",
+        "sklearn.linear_model.LogisticRegression",
+        "sklearn.metrics.pairwise.rbf_kernel",
+        "sklearn.metrics.roc_auc_score",
+        "sklearn.model_selection.train_test_split",
+        "sklearn.pipeline.Pipeline",
+        "sklearn.preprocessing.OneHotEncoder",
+        "sklearn.preprocessing.StandardScaler",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.utils.data_utils.infer_column_types"
+      ],
+      "functions": [
+        {
+          "name": "dependency_similarity",
+          "kind": "function",
+          "line": 24,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "_categorical_dependency_similarity",
+            "_matrix_similarity",
+            "_mixed_dependency_similarity",
+            "float",
+            "infer_column_types",
+            "list",
+            "np.mean",
+            "parts.items",
+            "parts.values",
+            "round"
+          ]
+        },
+        {
+          "name": "mmd_similarity",
+          "kind": "function",
+          "line": 50,
+          "arguments": [
+            "original",
+            "synthetic",
+            "random_state"
+          ],
+          "calls": [
+            "_balanced_samples",
+            "_preprocessor",
+            "fit_transform",
+            "float",
+            "get_settings",
+            "hasattr",
+            "len",
+            "max",
+            "mean",
+            "np.asarray",
+            "np.linalg.norm",
+            "np.median",
+            "np.vstack",
+            "pd.concat",
+            "rbf_kernel",
+            "round",
+            "str",
+            "transformed.toarray"
+          ]
+        },
+        {
+          "name": "discriminator_ensemble",
+          "kind": "function",
+          "line": 85,
+          "arguments": [
+            "original",
+            "synthetic",
+            "random_state"
+          ],
+          "calls": [
+            "HistGradientBoostingClassifier",
+            "LogisticRegression",
+            "RandomForestClassifier",
+            "_balanced_samples",
+            "_preprocessor",
+            "abs",
+            "aucs.append",
+            "float",
+            "get_settings",
+            "hasattr",
+            "len",
+            "max",
+            "min",
+            "model.fit",
+            "model.predict_proba",
+            "models.items",
+            "np.array",
+            "np.asarray",
+            "np.clip",
+            "np.mean",
+            "pd.concat",
+            "preprocessor.fit_transform",
+            "preprocessor.transform",
+            "roc_auc_score",
+            "round",
+            "similarities.append",
+            "str",
+            "test_matrix.toarray",
+            "train_matrix.toarray",
+            "train_test_split"
+          ]
+        },
+        {
+          "name": "_balanced_samples",
+          "kind": "function",
+          "line": 137,
+          "arguments": [
+            "original",
+            "synthetic",
+            "cap",
+            "random_state"
+          ],
+          "calls": [
+            "len",
+            "min",
+            "pd.DataFrame",
+            "reset_index",
+            "sample"
+          ]
+        },
+        {
+          "name": "_preprocessor",
+          "kind": "function",
+          "line": 150,
+          "arguments": [
+            "df"
+          ],
+          "calls": [
+            "ColumnTransformer",
+            "OneHotEncoder",
+            "Pipeline",
+            "SimpleImputer",
+            "StandardScaler",
+            "ValueError",
+            "infer_column_types",
+            "transformers.append"
+          ]
+        },
+        {
+          "name": "_matrix_similarity",
+          "kind": "function",
+          "line": 162,
+          "arguments": [
+            "original",
+            "synthetic",
+            "columns",
+            "method"
+          ],
+          "calls": [
+            "corr",
+            "fillna",
+            "float",
+            "len",
+            "mean",
+            "np.abs",
+            "np.clip",
+            "np.triu_indices",
+            "to_numpy"
+          ]
+        },
+        {
+          "name": "_cramers_v",
+          "kind": "function",
+          "line": 171,
+          "arguments": [
+            "first",
+            "second"
+          ],
+          "calls": [
+            "first.astype",
+            "float",
+            "min",
+            "np.maximum",
+            "np.outer",
+            "np.sqrt",
+            "observed.sum",
+            "pd.crosstab",
+            "second.astype",
+            "sum",
+            "table.to_numpy"
+          ]
+        },
+        {
+          "name": "_categorical_dependency_similarity",
+          "kind": "function",
+          "line": 181,
+          "arguments": [
+            "original",
+            "synthetic",
+            "columns"
+          ],
+          "calls": [
+            "_cramers_v",
+            "abs",
+            "differences.append",
+            "enumerate",
+            "float",
+            "len",
+            "np.clip",
+            "np.mean"
+          ]
+        },
+        {
+          "name": "_correlation_ratio",
+          "kind": "function",
+          "line": 191,
+          "arguments": [
+            "categories",
+            "values"
+          ],
+          "calls": [
+            "categories.astype",
+            "dropna",
+            "float",
+            "frame.groupby",
+            "len",
+            "mean",
+            "np.sqrt",
+            "nunique",
+            "pd.DataFrame",
+            "pd.to_numeric",
+            "sum"
+          ]
+        },
+        {
+          "name": "_mixed_dependency_similarity",
+          "kind": "function",
+          "line": 201,
+          "arguments": [
+            "original",
+            "synthetic",
+            "numerical",
+            "categorical"
+          ],
+          "calls": [
+            "_correlation_ratio",
+            "abs",
+            "float",
+            "np.clip",
+            "np.mean"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.constraints",
+      "path": "app/evaluation/constraints.py",
+      "imports": [
+        "__future__.annotations",
+        "app.utils.data_utils.infer_semantic_types",
+        "numpy",
+        "pandas",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.utils.data_utils.infer_semantic_types"
+      ],
+      "functions": [
+        {
+          "name": "discover_constraints",
+          "kind": "function",
+          "line": 13,
+          "arguments": [
+            "df",
+            "semantic_types"
+          ],
+          "calls": [
+            "any",
+            "astype",
+            "categories.index.tolist",
+            "dropna",
+            "float",
+            "get",
+            "index.tolist",
+            "infer_semantic_types",
+            "isoformat",
+            "len",
+            "max",
+            "np.allclose",
+            "np.round",
+            "numeric.max",
+            "numeric.min",
+            "numeric.nunique",
+            "parsed.max",
+            "parsed.min",
+            "parsed.notna",
+            "pd.api.types.is_numeric_dtype",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "rules.append",
+            "rules.extend",
+            "semantics.get",
+            "series.dropna",
+            "sorted",
+            "str",
+            "values.value_counts"
+          ]
+        },
+        {
+          "name": "validate_constraints",
+          "kind": "function",
+          "line": 64,
+          "arguments": [
+            "real_df",
+            "synthetic_df",
+            "constraints"
+          ],
+          "calls": [
+            "_rule_violations",
+            "bad.sum",
+            "discover_constraints",
+            "discovered.get",
+            "float",
+            "int",
+            "items",
+            "len",
+            "np.clip",
+            "round",
+            "sum",
+            "violations.values"
+          ]
+        },
+        {
+          "name": "_rule_violations",
+          "kind": "function",
+          "line": 112,
+          "arguments": [
+            "series",
+            "rule"
+          ],
+          "calls": [
+            "isin",
+            "np.isclose",
+            "np.round",
+            "numeric.notna",
+            "parsed.notna",
+            "pd.Timestamp",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "series.astype",
+            "series.notna"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.diversity",
+      "path": "app/evaluation/diversity.py",
+      "imports": [
+        "__future__.annotations",
+        "app.utils.data_utils.infer_column_types",
+        "numpy",
+        "pandas"
+      ],
+      "internal_imports": [
+        "app.utils.data_utils.infer_column_types"
+      ],
+      "functions": [
+        {
+          "name": "diversity_score",
+          "kind": "function",
+          "line": 17,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "a.max",
+            "a.min",
+            "astype",
+            "b.max",
+            "b.min",
+            "coverages.append",
+            "details.values",
+            "dropna",
+            "float",
+            "infer_column_types",
+            "len",
+            "list",
+            "max",
+            "min",
+            "np.clip",
+            "np.mean",
+            "pd.to_numeric",
+            "ranges.append",
+            "set",
+            "synthetic.drop_duplicates",
+            "unique"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.fairness",
+      "path": "app/evaluation/fairness.py",
+      "imports": [
+        "__future__.annotations",
+        "app.schemas.schemas.FairnessResult",
+        "pandas",
+        "sklearn.metrics.f1_score",
+        "sklearn.metrics.precision_score",
+        "sklearn.metrics.recall_score",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.FairnessResult"
+      ],
+      "functions": [
+        {
+          "name": "group_performance",
+          "kind": "function",
+          "line": 13,
+          "arguments": [
+            "y_true",
+            "y_pred",
+            "groups",
+            "task_type"
+          ],
+          "calls": [
+            "FairnessResult",
+            "_safe_f1",
+            "_safe_prf",
+            "float",
+            "frame.groupby",
+            "groups.astype",
+            "len",
+            "m.get",
+            "max",
+            "metrics.values",
+            "min",
+            "nunique",
+            "pd.DataFrame",
+            "str"
+          ]
+        },
+        {
+          "name": "_safe_f1",
+          "kind": "function",
+          "line": 40,
+          "arguments": [
+            "y_true",
+            "y_pred"
+          ],
+          "calls": [
+            "f1_score",
+            "float"
+          ]
+        },
+        {
+          "name": "_safe_prf",
+          "kind": "function",
+          "line": 47,
+          "arguments": [
+            "fn",
+            "part"
+          ],
+          "calls": [
+            "float",
+            "fn"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.fidelity",
+      "path": "app/evaluation/fidelity.py",
+      "imports": [
+        "__future__.annotations",
+        "app.utils.data_utils.infer_column_types",
+        "numpy",
+        "pandas",
+        "scipy.spatial.distance.jensenshannon",
+        "scipy.stats.ks_2samp",
+        "scipy.stats.wasserstein_distance"
+      ],
+      "internal_imports": [
+        "app.utils.data_utils.infer_column_types"
+      ],
+      "functions": [
+        {
+          "name": "_safe_series",
+          "kind": "function",
+          "line": 21,
+          "arguments": [
+            "s"
+          ],
+          "calls": [
+            "s.dropna"
+          ]
+        },
+        {
+          "name": "fidelity_score",
+          "kind": "function",
+          "line": 25,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "_safe_series",
+            "abs",
+            "astype",
+            "dropna",
+            "float",
+            "infer_column_types",
+            "ks_2samp",
+            "len",
+            "list",
+            "np.clip",
+            "np.mean",
+            "p.get",
+            "pd.to_numeric",
+            "q.get",
+            "scores.values",
+            "set",
+            "sum",
+            "value_counts"
+          ]
+        },
+        {
+          "name": "distribution_score",
+          "kind": "function",
+          "line": 50,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "_safe_series",
+            "a.std",
+            "abs",
+            "astype",
+            "dropna",
+            "float",
+            "infer_column_types",
+            "len",
+            "np.clip",
+            "np.mean",
+            "p.get",
+            "parts.append",
+            "pd.to_numeric",
+            "q.get",
+            "set",
+            "sum",
+            "value_counts",
+            "wasserstein_distance"
+          ]
+        },
+        {
+          "name": "distribution_details",
+          "kind": "function",
+          "line": 78,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "_safe_series",
+            "astype",
+            "dropna",
+            "fake.max",
+            "fake.min",
+            "float",
+            "infer_column_types",
+            "jensenshannon",
+            "ks_2samp",
+            "len",
+            "max",
+            "mean",
+            "min",
+            "np.abs",
+            "np.array",
+            "np.clip",
+            "np.diff",
+            "np.histogram",
+            "np.linspace",
+            "np.mean",
+            "np.minimum",
+            "np.quantile",
+            "p.get",
+            "pd.to_numeric",
+            "q.get",
+            "real.max",
+            "real.min",
+            "real.std",
+            "round",
+            "set",
+            "sorted",
+            "sum",
+            "value_counts",
+            "wasserstein_distance"
+          ]
+        },
+        {
+          "name": "correlation_score",
+          "kind": "function",
+          "line": 133,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "corr",
+            "corr_a.to_numpy",
+            "corr_b.reindex",
+            "corr_b.to_numpy",
+            "fillna",
+            "float",
+            "infer_column_types",
+            "len",
+            "mean",
+            "np.abs",
+            "np.clip",
+            "np.triu_indices"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.privacy",
+      "path": "app/evaluation/privacy.py",
+      "imports": [
+        "__future__.annotations",
+        "app.utils.data_utils.infer_column_types",
+        "numpy",
+        "pandas",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.utils.data_utils.infer_column_types"
+      ],
+      "functions": [
+        {
+          "name": "basic_privacy_indicators",
+          "kind": "function",
+          "line": 21,
+          "arguments": [
+            "original",
+            "synthetic",
+            "sample_size",
+            "random_state"
+          ],
+          "calls": [
+            "_nearest_neighbor_rate",
+            "_risk_level",
+            "apply",
+            "float",
+            "len",
+            "max",
+            "np.clip",
+            "orig_t.tolist",
+            "original.astype",
+            "r.tolist",
+            "set",
+            "sum",
+            "synthetic.astype",
+            "tuple"
+          ]
+        },
+        {
+          "name": "_risk_level",
+          "kind": "function",
+          "line": 47,
+          "arguments": [
+            "exact_duplicate_rate",
+            "high_similarity_rate"
+          ],
+          "calls": []
+        },
+        {
+          "name": "_nearest_neighbor_rate",
+          "kind": "function",
+          "line": 56,
+          "arguments": [
+            "original",
+            "synthetic",
+            "sample_size",
+            "random_state",
+            "threshold"
+          ],
+          "calls": [
+            "a.max",
+            "a.min",
+            "a.notna",
+            "abs",
+            "any",
+            "float",
+            "infer_column_types",
+            "len",
+            "min",
+            "np.random.default_rng",
+            "orig_sample.iterrows",
+            "pd.Series",
+            "pd.isna",
+            "pd.to_numeric",
+            "rng.choice",
+            "str",
+            "syn_sample.iterrows"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.unsupervised_utility",
+      "path": "app/evaluation/unsupervised_utility.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_score",
+        "app.schemas.schemas.UnsupervisedUtilityResult",
+        "app.utils.data_utils.infer_column_types",
+        "numpy",
+        "pandas",
+        "sklearn.compose.ColumnTransformer",
+        "sklearn.decomposition.PCA",
+        "sklearn.impute.SimpleImputer",
+        "sklearn.metrics.roc_auc_score",
+        "sklearn.model_selection.train_test_split",
+        "sklearn.neighbors.KNeighborsClassifier",
+        "sklearn.pipeline.Pipeline",
+        "sklearn.preprocessing.OneHotEncoder",
+        "sklearn.preprocessing.StandardScaler"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.evaluation.diversity.diversity_score",
+        "app.evaluation.fidelity.correlation_score",
+        "app.evaluation.fidelity.distribution_score",
+        "app.schemas.schemas.UnsupervisedUtilityResult",
+        "app.utils.data_utils.infer_column_types"
+      ],
+      "functions": [
+        {
+          "name": "evaluate_unsupervised_utility",
+          "kind": "function",
+          "line": 39,
+          "arguments": [
+            "original",
+            "synthetic",
+            "random_state"
+          ],
+          "calls": [
+            "UnsupervisedUtilityResult",
+            "_knn_similarity_score",
+            "_pca_structure_score",
+            "correlation_score",
+            "distribution_score",
+            "diversity_score",
+            "float",
+            "get_settings",
+            "np.mean",
+            "round",
+            "scores.append"
+          ]
+        },
+        {
+          "name": "_pca_structure_score",
+          "kind": "function",
+          "line": 74,
+          "arguments": [
+            "original",
+            "synthetic"
+          ],
+          "calls": [
+            "PCA",
+            "StandardScaler",
+            "apply",
+            "diff.mean",
+            "dropna",
+            "fit",
+            "float",
+            "infer_column_types",
+            "len",
+            "min",
+            "np.abs",
+            "np.clip",
+            "scaler.fit_transform",
+            "scaler.transform"
+          ]
+        },
+        {
+          "name": "_knn_similarity_score",
+          "kind": "function",
+          "line": 104,
+          "arguments": [
+            "original",
+            "synthetic",
+            "random_state"
+          ],
+          "calls": [
+            "ColumnTransformer",
+            "KNeighborsClassifier",
+            "OneHotEncoder",
+            "Pipeline",
+            "SimpleImputer",
+            "StandardScaler",
+            "abs",
+            "copy",
+            "float",
+            "get_settings",
+            "infer_column_types",
+            "int",
+            "len",
+            "min",
+            "model.fit",
+            "model.predict_proba",
+            "np.array",
+            "np.clip",
+            "pd.concat",
+            "roc_auc_score",
+            "sample",
+            "str",
+            "train_test_split",
+            "transformers.append"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.utility",
+      "path": "app/evaluation/utility.py",
+      "imports": [
+        "__future__.annotations",
+        "app.schemas.schemas.ModelMetrics"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.ModelMetrics"
+      ],
+      "functions": [
+        {
+          "name": "primary_improvement",
+          "kind": "function",
+          "line": 8,
+          "arguments": [
+            "baseline",
+            "augmented"
+          ],
+          "calls": [
+            "abs",
+            "float"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.evaluation.watermark",
+      "path": "app/evaluation/watermark.py",
+      "imports": [
+        "__future__.annotations",
+        "app.schemas.schemas.ProvenanceFingerprint",
+        "app.schemas.schemas.utc_now",
+        "hashlib",
+        "pandas"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.ProvenanceFingerprint",
+        "app.schemas.schemas.utc_now"
+      ],
+      "functions": [
+        {
+          "name": "provenance_fingerprint",
+          "kind": "function",
+          "line": 12,
+          "arguments": [
+            "df",
+            "generator",
+            "random_seed"
+          ],
+          "calls": [
+            "ProvenanceFingerprint",
+            "df.to_csv",
+            "encode",
+            "hashlib.sha256",
+            "hexdigest",
+            "len",
+            "list",
+            "utc_now"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.generators.__init__",
+      "path": "app/generators/__init__.py",
+      "imports": [
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.bootstrap_generator.BootstrapGenerator",
+        "app.generators.copula_generator.GaussianCopulaGenerator",
+        "app.generators.ctgan_generator.CTGANGenerator",
+        "app.generators.tvae_generator.TVAEGenerator"
+      ],
+      "internal_imports": [
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.bootstrap_generator.BootstrapGenerator",
+        "app.generators.copula_generator.GaussianCopulaGenerator",
+        "app.generators.ctgan_generator.CTGANGenerator",
+        "app.generators.tvae_generator.TVAEGenerator"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.generators.base",
+      "path": "app/generators/base.py",
+      "imports": [
+        "__future__.annotations",
+        "abc.ABC",
+        "abc.abstractmethod",
+        "app.utils.exceptions.GeneratorError",
+        "numpy",
+        "pandas",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.Field",
+        "typing.Any",
+        "typing.Literal"
+      ],
+      "internal_imports": [
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "AdvancedConfig",
+          "line": 10,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "GeneratorConfig",
+          "line": 24,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "SamplingConfig",
+          "line": 32,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "BaseSyntheticGenerator",
+          "line": 41,
+          "bases": [
+            "ABC"
+          ],
+          "methods": [
+            {
+              "name": "validate_input",
+              "kind": "function",
+              "line": 44,
+              "arguments": [
+                "self",
+                "data"
+              ],
+              "calls": [
+                "GeneratorError",
+                "all",
+                "any",
+                "data.columns.duplicated",
+                "data.select_dtypes",
+                "isinstance",
+                "np.isinf",
+                "to_numpy"
+              ]
+            },
+            {
+              "name": "get_capabilities",
+              "kind": "function",
+              "line": 53,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "asdict"
+              ]
+            },
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 59,
+              "arguments": [
+                "self",
+                "data",
+                "config"
+              ],
+              "calls": []
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 63,
+              "arguments": [
+                "self",
+                "num_samples",
+                "config"
+              ],
+              "calls": []
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 67,
+              "arguments": [
+                "self"
+              ],
+              "calls": []
+            },
+            {
+              "name": "generate",
+              "kind": "function",
+              "line": 70,
+              "arguments": [
+                "self",
+                "df",
+                "num_samples",
+                "random_state",
+                "epochs",
+                "condition_column",
+                "condition_value",
+                "config"
+              ],
+              "calls": [
+                "GeneratorConfig",
+                "SamplingConfig",
+                "self._validate_sampling",
+                "self.fit",
+                "self.sample"
+              ]
+            },
+            {
+              "name": "_validate_sampling",
+              "kind": "function",
+              "line": 79,
+              "arguments": [
+                "self",
+                "num_samples",
+                "config"
+              ],
+              "calls": [
+                "GeneratorError",
+                "isinstance"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.generators.bootstrap_generator",
+      "path": "app/generators/bootstrap_generator.py",
+      "imports": [
+        "__future__.annotations",
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.generators.runtime.resolve_device",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger",
+        "numpy",
+        "pandas"
+      ],
+      "internal_imports": [
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.generators.runtime.resolve_device",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "BootstrapGenerator",
+          "line": 17,
+          "bases": [
+            "BaseSyntheticGenerator"
+          ],
+          "methods": [
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 20,
+              "arguments": [
+                "self",
+                "data",
+                "config"
+              ],
+              "calls": [
+                "GeneratorConfig",
+                "GeneratorError",
+                "cfg.model_copy",
+                "data.copy",
+                "np.random.default_rng",
+                "resolve_device",
+                "self.validate_input"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 34,
+              "arguments": [
+                "self",
+                "num_samples",
+                "config"
+              ],
+              "calls": [
+                "GeneratorError",
+                "SamplingConfig",
+                "getattr",
+                "self._sample_from_frame",
+                "self._validate_sampling"
+              ]
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 42,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "getattr",
+                "list",
+                "self._config.model_dump"
+              ]
+            },
+            {
+              "name": "_sample_from_frame",
+              "kind": "function",
+              "line": 48,
+              "arguments": [
+                "self",
+                "df",
+                "num_samples",
+                "random_state",
+                "epochs",
+                "condition_column",
+                "condition_value"
+              ],
+              "calls": [
+                "GeneratorError",
+                "astype",
+                "conditioned.reset_index",
+                "copy",
+                "df.copy",
+                "float",
+                "infer_column_types",
+                "len",
+                "logger.info",
+                "np.random.default_rng",
+                "np.rint",
+                "original.max",
+                "original.min",
+                "original.std",
+                "out.reset_index",
+                "pd.api.types.is_bool_dtype",
+                "pd.api.types.is_integer_dtype",
+                "pd.notna",
+                "pd.to_numeric",
+                "reset_index",
+                "rng.integers",
+                "rng.normal",
+                "round",
+                "str",
+                "values.clip"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.generators.copula_generator",
+      "path": "app/generators/copula_generator.py",
+      "imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "internal_imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "GaussianCopulaGenerator",
+          "line": 4,
+          "bases": [
+            "SDVGenerator"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.generators.ctgan_generator",
+      "path": "app/generators/ctgan_generator.py",
+      "imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "internal_imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "CTGANGenerator",
+          "line": 4,
+          "bases": [
+            "SDVGenerator"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.generators.registry",
+      "path": "app/generators/registry.py",
+      "imports": [
+        "__future__.annotations",
+        "app.generators.bootstrap_generator.BootstrapGenerator",
+        "app.generators.copula_generator.GaussianCopulaGenerator",
+        "app.generators.ctgan_generator.CTGANGenerator",
+        "app.generators.tabsyn_generator.TabSynGenerator",
+        "app.generators.tvae_generator.TVAEGenerator",
+        "app.research.sources.source_status",
+        "app.utils.exceptions.GeneratorError",
+        "dataclasses.asdict",
+        "dataclasses.dataclass",
+        "importlib.util.find_spec",
+        "re",
+        "typing.Any",
+        "typing.Callable"
+      ],
+      "internal_imports": [
+        "app.generators.bootstrap_generator.BootstrapGenerator",
+        "app.generators.copula_generator.GaussianCopulaGenerator",
+        "app.generators.ctgan_generator.CTGANGenerator",
+        "app.generators.tabsyn_generator.TabSynGenerator",
+        "app.generators.tvae_generator.TVAEGenerator",
+        "app.research.sources.source_status",
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [
+        {
+          "name": "register_generator",
+          "kind": "function",
+          "line": 62,
+          "arguments": [
+            "name",
+            "registration"
+          ],
+          "calls": [
+            "GeneratorError",
+            "re.fullmatch"
+          ]
+        },
+        {
+          "name": "require_generator",
+          "kind": "function",
+          "line": 71,
+          "arguments": [
+            "name",
+            "include_experimental"
+          ],
+          "calls": [
+            "GENERATOR_REGISTRY.get",
+            "GeneratorError",
+            "get_available_generators"
+          ]
+        },
+        {
+          "name": "get_available_generators",
+          "kind": "function",
+          "line": 83,
+          "arguments": [
+            "include_experimental"
+          ],
+          "calls": [
+            "GENERATOR_REGISTRY.items",
+            "asdict",
+            "find_spec",
+            "registration.availability_check"
+          ]
+        },
+        {
+          "name": "create_generator",
+          "kind": "function",
+          "line": 111,
+          "arguments": [
+            "name",
+            "include_experimental"
+          ],
+          "calls": [
+            "GeneratorError",
+            "all",
+            "callable",
+            "getattr",
+            "registration.factory",
+            "require_generator"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "GeneratorCapabilities",
+          "line": 20,
+          "bases": [],
+          "methods": []
+        },
+        {
+          "name": "GeneratorRegistration",
+          "line": 40,
+          "bases": [],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.generators.runtime",
+      "path": "app/generators/runtime.py",
+      "imports": [
+        "app.utils.exceptions.GeneratorError",
+        "contextlib.contextmanager",
+        "numpy",
+        "random",
+        "threading.RLock"
+      ],
+      "internal_imports": [
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [
+        {
+          "name": "resolve_device",
+          "kind": "function",
+          "line": 13,
+          "arguments": [
+            "requested",
+            "supports_gpu",
+            "supports_cpu"
+          ],
+          "calls": [
+            "GeneratorError",
+            "torch.cuda.is_available"
+          ]
+        },
+        {
+          "name": "seeded_execution",
+          "kind": "function",
+          "line": 31,
+          "arguments": [
+            "seed",
+            "neural",
+            "device"
+          ],
+          "calls": [
+            "np.random.get_state",
+            "np.random.seed",
+            "np.random.set_state",
+            "random.getstate",
+            "random.seed",
+            "random.setstate",
+            "torch.cuda.current_device",
+            "torch.cuda.manual_seed",
+            "torch.random.default_generator.manual_seed",
+            "torch.random.fork_rng"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.generators.sdv_common",
+      "path": "app/generators/sdv_common.py",
+      "imports": [
+        "__future__.annotations",
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger",
+        "pandas",
+        "pandas.api.types.is_bool_dtype",
+        "pandas.api.types.is_categorical_dtype",
+        "pandas.api.types.is_datetime64_any_dtype",
+        "pandas.api.types.is_numeric_dtype"
+      ],
+      "internal_imports": [
+        "app.utils.exceptions.GeneratorError",
+        "app.utils.logging_config.get_logger"
+      ],
+      "functions": [
+        {
+          "name": "validate_input_dataframe",
+          "kind": "function",
+          "line": 22,
+          "arguments": [
+            "df"
+          ],
+          "calls": [
+            "GeneratorError",
+            "any",
+            "df.columns.duplicated",
+            "df.copy",
+            "head",
+            "isinstance",
+            "len",
+            "logger.warning",
+            "out.reset_index",
+            "series.astype",
+            "series.dropna",
+            "tolist",
+            "type"
+          ]
+        },
+        {
+          "name": "build_metadata",
+          "kind": "function",
+          "line": 64,
+          "arguments": [
+            "df"
+          ],
+          "calls": [
+            "GeneratorError",
+            "SingleTableMetadata",
+            "_classify_column",
+            "_remove_auto_primary_key",
+            "_update_column",
+            "callable",
+            "detected.get",
+            "get",
+            "getattr",
+            "len",
+            "logger.info",
+            "metadata.detect_from_dataframe",
+            "metadata.to_dict",
+            "validate_data",
+            "validate_input_dataframe",
+            "validate_method"
+          ]
+        },
+        {
+          "name": "_remove_auto_primary_key",
+          "kind": "function",
+          "line": 121,
+          "arguments": [
+            "metadata"
+          ],
+          "calls": [
+            "GeneratorError",
+            "metadata.remove_primary_key",
+            "metadata.to_dict"
+          ]
+        },
+        {
+          "name": "_update_column",
+          "kind": "function",
+          "line": 131,
+          "arguments": [
+            "metadata",
+            "column",
+            "decision"
+          ],
+          "calls": [
+            "GeneratorError",
+            "metadata.update_column"
+          ]
+        },
+        {
+          "name": "_classify_column",
+          "kind": "function",
+          "line": 140,
+          "arguments": [
+            "series",
+            "column",
+            "detected"
+          ],
+          "calls": [
+            "_is_boolean_like",
+            "_is_id_like",
+            "_is_integer_like",
+            "detected.get",
+            "int",
+            "is_bool_dtype",
+            "is_categorical_dtype",
+            "is_datetime64_any_dtype",
+            "is_numeric_dtype",
+            "non_null.nunique",
+            "series.dropna"
+          ]
+        },
+        {
+          "name": "_is_boolean_like",
+          "kind": "function",
+          "line": 164,
+          "arguments": [
+            "series"
+          ],
+          "calls": [
+            "lower",
+            "series.unique",
+            "str",
+            "strip"
+          ]
+        },
+        {
+          "name": "_is_id_like",
+          "kind": "function",
+          "line": 171,
+          "arguments": [
+            "series",
+            "column"
+          ],
+          "calls": [
+            "any",
+            "bool",
+            "column.lower",
+            "len",
+            "name.endswith",
+            "non_null.nunique",
+            "series.dropna"
+          ]
+        },
+        {
+          "name": "_is_integer_like",
+          "kind": "function",
+          "line": 180,
+          "arguments": [
+            "series"
+          ],
+          "calls": [
+            "all",
+            "bool",
+            "dropna",
+            "is_numeric_dtype",
+            "pd.to_numeric"
+          ]
+        },
+        {
+          "name": "set_random_state",
+          "kind": "function",
+          "line": 187,
+          "arguments": [
+            "synthesizer",
+            "random_state"
+          ],
+          "calls": [
+            "GeneratorError",
+            "callable",
+            "getattr",
+            "logger.info",
+            "logger.warning",
+            "method"
+          ]
+        },
+        {
+          "name": "fit_sdv",
+          "kind": "function",
+          "line": 215,
+          "arguments": [
+            "synthesizer",
+            "df",
+            "random_state"
+          ],
+          "calls": [
+            "GeneratorError",
+            "set_random_state",
+            "synthesizer.fit",
+            "validate_input_dataframe"
+          ]
+        },
+        {
+          "name": "sample_sdv",
+          "kind": "function",
+          "line": 232,
+          "arguments": [
+            "synthesizer",
+            "num_samples",
+            "condition_column",
+            "condition_value",
+            "max_tries_per_batch"
+          ],
+          "calls": [
+            "Condition",
+            "GeneratorError",
+            "callable",
+            "conditional_sampler",
+            "getattr",
+            "isinstance",
+            "len",
+            "pd.DataFrame",
+            "synthesizer.sample",
+            "synthetic.reset_index"
+          ]
+        },
+        {
+          "name": "validate_generated_output",
+          "kind": "function",
+          "line": 310,
+          "arguments": [
+            "original",
+            "synthetic",
+            "expected_rows"
+          ],
+          "calls": [
+            "GeneratorError",
+            "copy",
+            "len",
+            "synthetic.reset_index"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.generators.sdv_generator",
+      "path": "app/generators/sdv_generator.py",
+      "imports": [
+        "__future__.annotations",
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.generators.runtime.resolve_device",
+        "app.generators.runtime.seeded_execution",
+        "app.generators.sdv_common.build_metadata",
+        "app.generators.sdv_common.fit_sdv",
+        "app.generators.sdv_common.sample_sdv",
+        "app.generators.sdv_common.validate_generated_output",
+        "app.utils.exceptions.GeneratorError",
+        "importlib.metadata.version",
+        "inspect",
+        "pandas",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.generators.runtime.resolve_device",
+        "app.generators.runtime.seeded_execution",
+        "app.generators.sdv_common.build_metadata",
+        "app.generators.sdv_common.fit_sdv",
+        "app.generators.sdv_common.sample_sdv",
+        "app.generators.sdv_common.validate_generated_output",
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "SDVGenerator",
+          "line": 16,
+          "bases": [
+            "BaseSyntheticGenerator"
+          ],
+          "methods": [
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 20,
+              "arguments": [
+                "self",
+                "data",
+                "config"
+              ],
+              "calls": [
+                "GeneratorConfig",
+                "GeneratorError",
+                "build_metadata",
+                "cfg.model_dump",
+                "constructor",
+                "copy",
+                "fit_sdv",
+                "getattr",
+                "inspect.signature",
+                "kwargs.update",
+                "len",
+                "message.lower",
+                "metadata.to_dict",
+                "resolve_device",
+                "seeded_execution",
+                "self.validate_input",
+                "str"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 67,
+              "arguments": [
+                "self",
+                "num_samples",
+                "config"
+              ],
+              "calls": [
+                "GeneratorError",
+                "SamplingConfig",
+                "callable",
+                "cfg.model_dump",
+                "getattr",
+                "hasattr",
+                "message.lower",
+                "sample_sdv",
+                "sampling_metadata.get",
+                "seeded_execution",
+                "self._validate_sampling",
+                "str",
+                "validate_generated_output",
+                "value.item"
+              ]
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 95,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "getattr",
+                "self._config.model_dump",
+                "version"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.generators.tabsyn_generator",
+      "path": "app/generators/tabsyn_generator.py",
+      "imports": [
+        "app.config.get_settings",
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.research.sources.ROOT",
+        "app.research.sources.SOURCES",
+        "app.research.sources.source_path",
+        "app.research.sources.worker_python",
+        "app.utils.exceptions.GeneratorError",
+        "json",
+        "os",
+        "pandas",
+        "pathlib.Path",
+        "subprocess",
+        "sys",
+        "uuid.uuid4"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.generators.base.BaseSyntheticGenerator",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.base.SamplingConfig",
+        "app.research.sources.ROOT",
+        "app.research.sources.SOURCES",
+        "app.research.sources.source_path",
+        "app.research.sources.worker_python",
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "TabSynGenerator",
+          "line": 17,
+          "bases": [
+            "BaseSyntheticGenerator"
+          ],
+          "methods": [
+            {
+              "name": "_worker",
+              "kind": "function",
+              "line": 20,
+              "arguments": [
+                "self",
+                "operation",
+                "count"
+              ],
+              "calls": [
+                "GeneratorError",
+                "int",
+                "os.environ.get",
+                "str",
+                "subprocess.run",
+                "worker_python"
+              ]
+            },
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 27,
+              "arguments": [
+                "self",
+                "data",
+                "config"
+              ],
+              "calls": [
+                "GeneratorConfig",
+                "Path",
+                "cfg.model_dump",
+                "data.to_csv",
+                "get_settings",
+                "json.dumps",
+                "resolve",
+                "self._worker",
+                "self.directory.mkdir",
+                "self.validate_input",
+                "source_path",
+                "str",
+                "uuid4",
+                "write_text"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 41,
+              "arguments": [
+                "self",
+                "num_samples",
+                "config"
+              ],
+              "calls": [
+                "GeneratorError",
+                "SamplingConfig",
+                "getattr",
+                "len",
+                "pd.read_csv",
+                "self._validate_sampling",
+                "self._worker"
+              ]
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 54,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "getattr",
+                "json.loads",
+                "read_text",
+                "str"
+              ]
+            },
+            {
+              "name": "load",
+              "kind": "function",
+              "line": 61,
+              "arguments": [
+                "cls",
+                "directory"
+              ],
+              "calls": [
+                "GeneratorError",
+                "Path",
+                "cls",
+                "exists",
+                "json.loads",
+                "read_text",
+                "resolve",
+                "source_path"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.generators.tvae_generator",
+      "path": "app/generators/tvae_generator.py",
+      "imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "internal_imports": [
+        "app.generators.sdv_generator.SDVGenerator"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "TVAEGenerator",
+          "line": 4,
+          "bases": [
+            "SDVGenerator"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.models.__init__",
+      "path": "app/models/__init__.py",
+      "imports": [
+        "app.models.benchmark_model.DownstreamModel"
+      ],
+      "internal_imports": [
+        "app.models.benchmark_model.DownstreamModel"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.models.benchmark_model",
+      "path": "app/models/benchmark_model.py",
+      "imports": [
+        "__future__.annotations",
+        "app.schemas.schemas.ModelMetrics",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.exceptions.BenchmarkError",
+        "pandas",
+        "sklearn.compose.ColumnTransformer",
+        "sklearn.ensemble.HistGradientBoostingClassifier",
+        "sklearn.ensemble.HistGradientBoostingRegressor",
+        "sklearn.ensemble.RandomForestClassifier",
+        "sklearn.ensemble.RandomForestRegressor",
+        "sklearn.impute.SimpleImputer",
+        "sklearn.linear_model.LogisticRegression",
+        "sklearn.linear_model.Ridge",
+        "sklearn.metrics.accuracy_score",
+        "sklearn.metrics.f1_score",
+        "sklearn.metrics.mean_absolute_error",
+        "sklearn.metrics.mean_squared_error",
+        "sklearn.metrics.precision_score",
+        "sklearn.metrics.r2_score",
+        "sklearn.metrics.recall_score",
+        "sklearn.metrics.roc_auc_score",
+        "sklearn.pipeline.Pipeline",
+        "sklearn.preprocessing.OneHotEncoder",
+        "sklearn.preprocessing.StandardScaler"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.ModelMetrics",
+        "app.utils.data_utils.infer_column_types",
+        "app.utils.exceptions.BenchmarkError"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "DownstreamModel",
+          "line": 33,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 34,
+              "arguments": [
+                "self",
+                "task_type",
+                "random_state",
+                "model_name"
+              ],
+              "calls": []
+            },
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 40,
+              "arguments": [
+                "self",
+                "X",
+                "y"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "ColumnTransformer",
+                "OneHotEncoder",
+                "Pipeline",
+                "SimpleImputer",
+                "StandardScaler",
+                "infer_column_types",
+                "self._make_estimator",
+                "self.pipeline.fit",
+                "transformers.append"
+              ]
+            },
+            {
+              "name": "predict",
+              "kind": "function",
+              "line": 67,
+              "arguments": [
+                "self",
+                "X"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "self.pipeline.predict"
+              ]
+            },
+            {
+              "name": "evaluate",
+              "kind": "function",
+              "line": 72,
+              "arguments": [
+                "self",
+                "X",
+                "y",
+                "n_train"
+              ],
+              "calls": [
+                "BenchmarkError",
+                "self._classification_metrics",
+                "self._regression_metrics",
+                "self.pipeline.predict"
+              ]
+            },
+            {
+              "name": "_make_estimator",
+              "kind": "function",
+              "line": 80,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "HistGradientBoostingClassifier",
+                "HistGradientBoostingRegressor",
+                "LogisticRegression",
+                "RandomForestClassifier",
+                "RandomForestRegressor",
+                "Ridge"
+              ]
+            },
+            {
+              "name": "_classification_metrics",
+              "kind": "function",
+              "line": 105,
+              "arguments": [
+                "self",
+                "y",
+                "preds",
+                "X",
+                "n_train"
+              ],
+              "calls": [
+                "ModelMetrics",
+                "accuracy_score",
+                "f1_score",
+                "float",
+                "hasattr",
+                "int",
+                "len",
+                "precision_score",
+                "recall_score",
+                "roc_auc_score",
+                "self.pipeline.predict_proba",
+                "y.nunique"
+              ]
+            },
+            {
+              "name": "_regression_metrics",
+              "kind": "function",
+              "line": 131,
+              "arguments": [
+                "self",
+                "y",
+                "preds",
+                "n_train"
+              ],
+              "calls": [
+                "ModelMetrics",
+                "float",
+                "int",
+                "len",
+                "mean_absolute_error",
+                "mean_squared_error",
+                "r2_score"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.pipeline.__init__",
+      "path": "app/pipeline/__init__.py",
+      "imports": [
+        "app.pipeline.orchestrator.PipelineConfig",
+        "app.pipeline.orchestrator.PipelineOutput",
+        "app.pipeline.orchestrator.run_pipeline"
+      ],
+      "internal_imports": [
+        "app.pipeline.orchestrator.PipelineConfig",
+        "app.pipeline.orchestrator.PipelineOutput",
+        "app.pipeline.orchestrator.run_pipeline"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.pipeline.candidates",
+      "path": "app/pipeline/candidates.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.generators.registry.get_available_generators",
+        "app.schemas.schemas.GenerationPlan",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "hashlib.sha256",
+        "pandas",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.generators.registry.get_available_generators",
+        "app.schemas.schemas.GenerationPlan"
+      ],
+      "functions": [
+        {
+          "name": "propose_candidates",
+          "kind": "function",
+          "line": 53,
+          "arguments": [
+            "plan"
+          ],
+          "calls": [
+            "GeneratorCandidate",
+            "_plan_hyperparameters",
+            "any",
+            "availability.get",
+            "candidates.append",
+            "get",
+            "get_available_generators",
+            "get_settings",
+            "int",
+            "len",
+            "max",
+            "min",
+            "round"
+          ]
+        },
+        {
+          "name": "_plan_hyperparameters",
+          "kind": "function",
+          "line": 83,
+          "arguments": [
+            "plan",
+            "generator_name"
+          ],
+          "calls": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "GeneratorCandidate",
+          "line": 21,
+          "bases": [],
+          "methods": [
+            {
+              "name": "cache_key",
+              "kind": "function",
+              "line": 27,
+              "arguments": [
+                "self",
+                "dataframe",
+                "random_state",
+                "condition"
+              ],
+              "calls": [
+                "digest.hexdigest",
+                "digest.update",
+                "encode",
+                "items",
+                "list",
+                "pd.util.hash_pandas_object",
+                "repr",
+                "self.generator_name.encode",
+                "self.hyperparameters.items",
+                "sha256",
+                "sorted",
+                "str",
+                "values.tobytes"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CandidateCache",
+          "line": 39,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 42,
+              "arguments": [
+                "self"
+              ],
+              "calls": []
+            },
+            {
+              "name": "get",
+              "kind": "function",
+              "line": 45,
+              "arguments": [
+                "self",
+                "key"
+              ],
+              "calls": [
+                "self._values.get",
+                "value.copy"
+              ]
+            },
+            {
+              "name": "put",
+              "kind": "function",
+              "line": 49,
+              "arguments": [
+                "self",
+                "key",
+                "value"
+              ],
+              "calls": [
+                "value.copy"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.pipeline.orchestrator",
+      "path": "app/pipeline/orchestrator.py",
+      "imports": [
+        "__future__.annotations",
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.llm_reasoner.LLMReasoner",
+        "app.agents.optimizer.OptimizationAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.agents.validator.ValidationAgent",
+        "app.config.get_settings",
+        "app.evaluation.fairness.group_performance",
+        "app.evaluation.unsupervised_utility.evaluate_unsupervised_utility",
+        "app.evaluation.watermark.provenance_fingerprint",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.GENERATOR_REGISTRY",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.pipeline.reporting.build_final_report_payload",
+        "app.pipeline.reporting.deterministic_final_report",
+        "app.schemas.schemas.AgentLog",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.IterationRecord",
+        "app.schemas.schemas.PipelineResult",
+        "app.schemas.schemas.utc_now",
+        "app.utils.exceptions.PipelineError",
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "hashlib.sha256",
+        "importlib.metadata.version",
+        "json",
+        "math",
+        "pandas",
+        "pathlib.Path",
+        "platform",
+        "uuid"
+      ],
+      "internal_imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.generator.GeneratorAgent",
+        "app.agents.llm_reasoner.LLMReasoner",
+        "app.agents.optimizer.OptimizationAgent",
+        "app.agents.planner.GenerationPlanner",
+        "app.agents.validator.ValidationAgent",
+        "app.config.get_settings",
+        "app.evaluation.fairness.group_performance",
+        "app.evaluation.unsupervised_utility.evaluate_unsupervised_utility",
+        "app.evaluation.watermark.provenance_fingerprint",
+        "app.generators.base.GeneratorConfig",
+        "app.generators.registry.GENERATOR_REGISTRY",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.pipeline.reporting.build_final_report_payload",
+        "app.pipeline.reporting.deterministic_final_report",
+        "app.schemas.schemas.AgentLog",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.IterationRecord",
+        "app.schemas.schemas.PipelineResult",
+        "app.schemas.schemas.utc_now",
+        "app.utils.exceptions.PipelineError",
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging"
+      ],
+      "functions": [
+        {
+          "name": "run_pipeline",
+          "kind": "function",
+          "line": 91,
+          "arguments": [
+            "df",
+            "target_column",
+            "config"
+          ],
+          "calls": [
+            "Path",
+            "PipelineConfig",
+            "_run_pipeline",
+            "asdict",
+            "df.to_csv",
+            "directory.mkdir",
+            "encode",
+            "get_settings",
+            "hasattr",
+            "hexdigest",
+            "json.dumps",
+            "manifest.update",
+            "platform.platform",
+            "platform.python_version",
+            "record_path.with_suffix",
+            "save_record",
+            "settings.model_dump",
+            "sha256",
+            "str",
+            "temporary.replace",
+            "temporary.write_text",
+            "torch.cuda.is_available",
+            "type",
+            "utc_now",
+            "uuid.uuid4",
+            "value.model_dump",
+            "version"
+          ]
+        },
+        {
+          "name": "_run_pipeline",
+          "kind": "function",
+          "line": 132,
+          "arguments": [
+            "df",
+            "target_column",
+            "config",
+            "run_id"
+          ],
+          "calls": [
+            "AgentLog",
+            "BenchmarkAgent",
+            "DatasetAnalyzer",
+            "DownstreamModel",
+            "GenerationPlan",
+            "GenerationPlanner",
+            "GeneratorAgent",
+            "GeneratorConfig",
+            "IterationRecord",
+            "LLMReasoner",
+            "OptimizationAgent",
+            "Path",
+            "PipelineConfig",
+            "PipelineError",
+            "PipelineOutput",
+            "PipelineResult",
+            "ValidationAgent",
+            "_hard_gate_failures",
+            "analysis.model_dump",
+            "analyzer.analyze",
+            "astype",
+            "aug.drop",
+            "bench.improvement.get",
+            "bench.model_dump",
+            "benchmark_agent.compare",
+            "benchmark_agent.evaluate_split",
+            "benchmark_agent.research_split",
+            "best_record.benchmark.model_dump",
+            "best_record.unsupervised_utility.model_dump",
+            "best_record.validation.model_dump",
+            "bool",
+            "build_final_report_payload",
+            "candidate_history.append",
+            "decisions.append",
+            "deterministic_final_report",
+            "evaluate_unsupervised_utility",
+            "final_benchmark.model_dump",
+            "float",
+            "generator_agent.generate",
+            "get_logger",
+            "get_settings",
+            "group_performance",
+            "info",
+            "int",
+            "iterations.append",
+            "join",
+            "json.dumps",
+            "len",
+            "list",
+            "log",
+            "logs.append",
+            "max",
+            "meta_path.write_text",
+            "min",
+            "model.fit",
+            "model.predict",
+            "next",
+            "optimizer.decide",
+            "optimizer.decide_unlabeled",
+            "output_dir.mkdir",
+            "pd.Series",
+            "pd.concat",
+            "plan.model_copy",
+            "plan.model_dump",
+            "plan.sample_count_details.get",
+            "planner.plan",
+            "provenance.model_dump_json",
+            "provenance_fingerprint",
+            "range",
+            "reasoner.explain",
+            "reasoner.explain_final_report",
+            "reset_index",
+            "result.model_dump_json",
+            "setup_logging",
+            "split_manifest.update",
+            "str",
+            "test.drop",
+            "utc_now",
+            "utility.model_dump",
+            "validation.model_dump",
+            "validator.validate",
+            "write_text"
+          ]
+        },
+        {
+          "name": "_hard_gate_failures",
+          "kind": "function",
+          "line": 639,
+          "arguments": [
+            "validation"
+          ],
+          "calls": [
+            "failures.append",
+            "get_settings",
+            "isinstance",
+            "privacy_details.get",
+            "validation.details.get"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "PipelineConfig",
+          "line": 45,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__post_init__",
+              "kind": "function",
+              "line": 63,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "GeneratorConfig",
+                "GeneratorConfig.model_validate",
+                "ValueError",
+                "getattr",
+                "isinstance",
+                "math.isfinite"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "PipelineOutput",
+          "line": 82,
+          "bases": [],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.pipeline.reporting",
+      "path": "app/pipeline/reporting.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.schemas.schemas.PipelineResult",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.schemas.schemas.PipelineResult"
+      ],
+      "functions": [
+        {
+          "name": "build_final_report_payload",
+          "kind": "function",
+          "line": 11,
+          "arguments": [
+            "result"
+          ],
+          "calls": [
+            "_failure_reasons",
+            "_family",
+            "candidates.append",
+            "next",
+            "result.baseline.model_dump"
+          ]
+        },
+        {
+          "name": "deterministic_final_report",
+          "kind": "function",
+          "line": 43,
+          "arguments": [
+            "payload"
+          ],
+          "calls": [
+            "dataset.get",
+            "item.get",
+            "join",
+            "payload.get"
+          ]
+        },
+        {
+          "name": "_family",
+          "kind": "function",
+          "line": 74,
+          "arguments": [
+            "generator"
+          ],
+          "calls": [
+            "get"
+          ]
+        },
+        {
+          "name": "_failure_reasons",
+          "kind": "function",
+          "line": 78,
+          "arguments": [
+            "item"
+          ],
+          "calls": [
+            "get_settings",
+            "item.validation.details.get",
+            "privacy.get",
+            "reasons.append"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.pipeline.selection",
+      "path": "app/pipeline/selection.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.schemas.schemas.CandidateEvaluation",
+        "typing.Literal"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.schemas.schemas.CandidateEvaluation"
+      ],
+      "functions": [
+        {
+          "name": "apply_hard_gates",
+          "kind": "function",
+          "line": 11,
+          "arguments": [
+            "candidate"
+          ],
+          "calls": [
+            "failed.append",
+            "get_settings",
+            "join"
+          ]
+        },
+        {
+          "name": "select_candidate",
+          "kind": "function",
+          "line": 30,
+          "arguments": [
+            "candidates",
+            "mode"
+          ],
+          "calls": [
+            "_dominates",
+            "_priority_score",
+            "any",
+            "apply_hard_gates",
+            "max"
+          ]
+        },
+        {
+          "name": "_dominates",
+          "kind": "function",
+          "line": 47,
+          "arguments": [
+            "left",
+            "right",
+            "mode"
+          ],
+          "calls": [
+            "_objectives",
+            "all",
+            "any",
+            "zip"
+          ]
+        },
+        {
+          "name": "_objectives",
+          "kind": "function",
+          "line": 53,
+          "arguments": [
+            "candidate",
+            "mode"
+          ],
+          "calls": []
+        },
+        {
+          "name": "_priority_score",
+          "kind": "function",
+          "line": 67,
+          "arguments": [
+            "candidate",
+            "mode"
+          ],
+          "calls": []
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.__init__",
+      "path": "app/research/__init__.py",
+      "imports": [],
+      "internal_imports": [],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.research.codec",
+      "path": "app/research/codec.py",
+      "imports": [
+        "numpy",
+        "pandas",
+        "sklearn.preprocessing.QuantileTransformer"
+      ],
+      "internal_imports": [],
+      "functions": [],
+      "classes": [
+        {
+          "name": "MixedTableCodec",
+          "line": 7,
+          "bases": [],
+          "methods": [
+            {
+              "name": "fit_transform",
+              "kind": "function",
+              "line": 8,
+              "arguments": [
+                "self",
+                "frame"
+              ],
+              "calls": [
+                "QuantileTransformer",
+                "any",
+                "append",
+                "astype",
+                "cats.append",
+                "dict.fromkeys",
+                "enumerate",
+                "float",
+                "isinstance",
+                "len",
+                "list",
+                "min",
+                "np.array",
+                "np.column_stack",
+                "np.empty",
+                "np.isfinite",
+                "np.nan_to_num",
+                "np.nanmedian",
+                "nums.append",
+                "pd.api.types.is_bool_dtype",
+                "pd.api.types.is_numeric_dtype",
+                "pd.isna",
+                "ravel",
+                "reshape",
+                "series.isna",
+                "series.nunique",
+                "series.to_numpy",
+                "str",
+                "to_numpy",
+                "tolist",
+                "transformer.fit_transform",
+                "transformer.quantiles_.ravel",
+                "transformer.references_.tolist",
+                "v.item"
+              ]
+            },
+            {
+              "name": "inverse",
+              "kind": "function",
+              "line": 34,
+              "arguments": [
+                "self",
+                "numerical",
+                "categorical"
+              ],
+              "calls": [
+                "QuantileTransformer",
+                "astype",
+                "dtype.startswith",
+                "enumerate",
+                "items",
+                "len",
+                "np.array",
+                "pd.DataFrame",
+                "pd.to_numeric",
+                "ravel",
+                "reshape",
+                "round",
+                "transformer.inverse_transform",
+                "values.astype"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.research.config",
+      "path": "app/research/config.py",
+      "imports": [
+        "app.generators.base.GeneratorConfig",
+        "app.timeseries.data.TimeSeriesSchema",
+        "app.timeseries.generators.SequenceConfig",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.Field",
+        "pydantic.model_validator",
+        "typing.Literal"
+      ],
+      "internal_imports": [
+        "app.generators.base.GeneratorConfig",
+        "app.timeseries.data.TimeSeriesSchema",
+        "app.timeseries.generators.SequenceConfig"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "ExperimentConfig",
+          "line": 8,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": [
+            {
+              "name": "modalities",
+              "kind": "function",
+              "line": 31,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "ValueError",
+                "model_validator"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.research.engine",
+      "path": "app/research/engine.py",
+      "imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.validator.ValidationAgent",
+        "app.evaluation.fairness.group_performance",
+        "app.generators.registry.create_generator",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.research.config.ExperimentConfig",
+        "app.research.evaluation.distance_privacy",
+        "app.research.evaluation.forecasting_utility",
+        "app.research.evaluation.sequence_metrics",
+        "app.research.planner.plan_experiment",
+        "app.research.selection.select_experiment_candidate",
+        "app.research.store.ExperimentStore",
+        "app.research.store.now",
+        "app.timeseries.data.prepare_sequences",
+        "app.timeseries.data.sequences_to_frame",
+        "app.timeseries.generators.SEQUENCE_GENERATORS",
+        "concurrent.futures.ThreadPoolExecutor",
+        "hashlib.sha256",
+        "importlib.metadata.version",
+        "json",
+        "numpy",
+        "pandas",
+        "platform",
+        "sklearn.model_selection.train_test_split",
+        "time",
+        "traceback"
+      ],
+      "internal_imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.agents.benchmark.BenchmarkAgent",
+        "app.agents.validator.ValidationAgent",
+        "app.evaluation.fairness.group_performance",
+        "app.generators.registry.create_generator",
+        "app.models.benchmark_model.DownstreamModel",
+        "app.research.config.ExperimentConfig",
+        "app.research.evaluation.distance_privacy",
+        "app.research.evaluation.forecasting_utility",
+        "app.research.evaluation.sequence_metrics",
+        "app.research.planner.plan_experiment",
+        "app.research.selection.select_experiment_candidate",
+        "app.research.store.ExperimentStore",
+        "app.research.store.now",
+        "app.timeseries.data.prepare_sequences",
+        "app.timeseries.data.sequences_to_frame",
+        "app.timeseries.generators.SEQUENCE_GENERATORS"
+      ],
+      "functions": [
+        {
+          "name": "_write",
+          "kind": "function",
+          "line": 31,
+          "arguments": [
+            "path",
+            "payload"
+          ],
+          "calls": [
+            "json.dumps",
+            "path.write_text"
+          ]
+        },
+        {
+          "name": "submit_experiment",
+          "kind": "function",
+          "line": 35,
+          "arguments": [
+            "frame",
+            "config",
+            "store",
+            "dataset_identifier"
+          ],
+          "calls": [
+            "EXECUTOR.submit",
+            "config.model_dump",
+            "encode",
+            "frame.to_csv",
+            "hexdigest",
+            "sha256",
+            "store.create",
+            "store.directory",
+            "store.get"
+          ]
+        },
+        {
+          "name": "execute_experiment",
+          "kind": "function",
+          "line": 42,
+          "arguments": [
+            "identifier",
+            "store"
+          ],
+          "calls": [
+            "ExperimentConfig",
+            "_write",
+            "now",
+            "pd.read_csv",
+            "platform.platform",
+            "platform.python_version",
+            "store.directory",
+            "store.event",
+            "store.get",
+            "store.update",
+            "str",
+            "tabular_experiment",
+            "temporal_experiment",
+            "time.perf_counter",
+            "traceback.format_exc",
+            "type",
+            "version",
+            "write_text"
+          ]
+        },
+        {
+          "name": "_split_table",
+          "kind": "function",
+          "line": 72,
+          "arguments": [
+            "frame",
+            "config"
+          ],
+          "calls": [
+            "BenchmarkAgent",
+            "DatasetAnalyzer",
+            "ValueError",
+            "_infer_task_type",
+            "len",
+            "np.arange",
+            "research_split",
+            "reset_index",
+            "splits.items",
+            "test.tolist",
+            "train.tolist",
+            "train_test_split",
+            "valid.tolist"
+          ]
+        },
+        {
+          "name": "_efficiency",
+          "kind": "function",
+          "line": 86,
+          "arguments": [
+            "metadata",
+            "fit_time",
+            "sample_time",
+            "count"
+          ],
+          "calls": [
+            "metadata.get"
+          ]
+        },
+        {
+          "name": "tabular_experiment",
+          "kind": "function",
+          "line": 95,
+          "arguments": [
+            "frame",
+            "config",
+            "directory",
+            "store",
+            "identifier"
+          ],
+          "calls": [
+            "BenchmarkAgent",
+            "DownstreamModel",
+            "ValidationAgent",
+            "ValueError",
+            "_candidate_names",
+            "_efficiency",
+            "_hard_gate_failures",
+            "_split_table",
+            "_write",
+            "agent.evaluate_split",
+            "astype",
+            "augmented.model_dump",
+            "config.generator_config.model_copy",
+            "create_generator",
+            "distance_privacy",
+            "downstream.fit",
+            "downstream.predict",
+            "evaluate_split",
+            "group_performance",
+            "json.loads",
+            "len",
+            "model.fit",
+            "model.get_metadata",
+            "model.sample",
+            "model_dump",
+            "pd.Series",
+            "pd.concat",
+            "select_experiment_candidate",
+            "splits.items",
+            "store.event",
+            "synthetic.drop",
+            "synthetic.head",
+            "synthetic.to_csv",
+            "test.drop",
+            "time.perf_counter",
+            "to_json",
+            "trtr.model_dump",
+            "tstr.model_dump",
+            "validate",
+            "validation.model_dump"
+          ]
+        },
+        {
+          "name": "temporal_experiment",
+          "kind": "function",
+          "line": 151,
+          "arguments": [
+            "frame",
+            "config",
+            "directory",
+            "store",
+            "identifier"
+          ],
+          "calls": [
+            "SEQUENCE_GENERATORS.get",
+            "ValueError",
+            "_candidate_names",
+            "_efficiency",
+            "_temporal_gates",
+            "_write",
+            "config.sequence_config.model_copy",
+            "config.sequence_schema.features.index",
+            "distance_privacy",
+            "factory",
+            "float",
+            "forecasting_utility",
+            "json.loads",
+            "len",
+            "model.fit",
+            "model.get_metadata",
+            "model.sample",
+            "np.mean",
+            "np.save",
+            "prepare_sequences",
+            "prepared.windows.items",
+            "real.to_json",
+            "select_experiment_candidate",
+            "sequence_metrics",
+            "sequences_to_frame",
+            "store.event",
+            "synthetic.to_json",
+            "time.perf_counter",
+            "to_csv"
+          ]
+        },
+        {
+          "name": "_candidate_names",
+          "kind": "function",
+          "line": 205,
+          "arguments": [
+            "frame",
+            "config"
+          ],
+          "calls": [
+            "ValueError",
+            "plan_experiment"
+          ]
+        },
+        {
+          "name": "_temporal_gates",
+          "kind": "function",
+          "line": 216,
+          "arguments": [
+            "quality",
+            "privacy",
+            "config"
+          ],
+          "calls": [
+            "failures.append",
+            "np.mean"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.evaluation",
+      "path": "app/research/evaluation.py",
+      "imports": [
+        "numpy",
+        "pandas",
+        "scipy.spatial.distance.cdist",
+        "scipy.spatial.distance.jensenshannon",
+        "scipy.stats.ks_2samp",
+        "sklearn.linear_model.Ridge",
+        "sklearn.metrics.mean_absolute_error",
+        "sklearn.metrics.mean_squared_error",
+        "sklearn.metrics.roc_auc_score"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "sequence_metrics",
+          "kind": "function",
+          "line": 10,
+          "arguments": [
+            "real",
+            "synthetic"
+          ],
+          "calls": [
+            "ValueError",
+            "a.mean",
+            "a.ravel",
+            "a.std",
+            "a.var",
+            "abs",
+            "acf",
+            "acf_errors.append",
+            "all",
+            "b.mean",
+            "b.ravel",
+            "b.std",
+            "b.var",
+            "correlation",
+            "cross_errors.append",
+            "float",
+            "jensenshannon",
+            "ks_2samp",
+            "len",
+            "max",
+            "mean",
+            "min",
+            "np.abs",
+            "np.arange",
+            "np.ascontiguousarray",
+            "np.corrcoef",
+            "np.fft.rfft",
+            "np.isfinite",
+            "np.mean",
+            "per_feature.append",
+            "power_a.sum",
+            "power_b.sum",
+            "range",
+            "ravel",
+            "row.tobytes",
+            "slope_a.mean",
+            "slope_b.mean",
+            "sum",
+            "time.mean",
+            "valid.any",
+            "values.mean"
+          ]
+        },
+        {
+          "name": "distance_privacy",
+          "kind": "function",
+          "line": 58,
+          "arguments": [
+            "train",
+            "holdout",
+            "synthetic",
+            "seed",
+            "cap",
+            "numerical"
+          ],
+          "calls": [
+            "astype",
+            "cdist",
+            "distances",
+            "float",
+            "frame.sample",
+            "isin",
+            "isinstance",
+            "len",
+            "list",
+            "mean",
+            "min",
+            "np.abs",
+            "np.ascontiguousarray",
+            "np.isfinite",
+            "np.isnan",
+            "np.mean",
+            "np.median",
+            "np.ones",
+            "np.random.default_rng",
+            "np.sqrt",
+            "np.where",
+            "np.zeros",
+            "pd.api.types.is_numeric_dtype",
+            "pd.to_numeric",
+            "pd.util.hash_pandas_object",
+            "real.std",
+            "reset_index",
+            "reshape",
+            "rng.choice",
+            "roc_auc_score",
+            "row.tobytes",
+            "sample",
+            "std",
+            "to_numpy"
+          ]
+        },
+        {
+          "name": "forecasting_utility",
+          "kind": "function",
+          "line": 102,
+          "arguments": [
+            "train",
+            "test",
+            "synthetic",
+            "target_index",
+            "horizon",
+            "span"
+          ],
+          "calls": [
+            "Ridge",
+            "ValueError",
+            "fit",
+            "float",
+            "len",
+            "mean_absolute_error",
+            "mean_squared_error",
+            "model.predict",
+            "np.concatenate",
+            "np.sqrt",
+            "reshape",
+            "xy"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.ingestion",
+      "path": "app/research/ingestion.py",
+      "imports": [
+        "io.BytesIO",
+        "pandas"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "read_table",
+          "kind": "function",
+          "line": 6,
+          "arguments": [
+            "content",
+            "filename",
+            "max_bytes"
+          ],
+          "calls": [
+            "BytesIO",
+            "ValueError",
+            "any",
+            "endswith",
+            "filename.lower",
+            "frame.columns.duplicated",
+            "len",
+            "pd.read_csv",
+            "pd.read_parquet"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.planner",
+      "path": "app/research/planner.py",
+      "imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.generators.registry.get_available_generators",
+        "app.research.sources.source_status",
+        "app.research.sources.worker_python",
+        "app.timeseries.data.profile_sequences",
+        "functools.lru_cache",
+        "json",
+        "subprocess"
+      ],
+      "internal_imports": [
+        "app.agents.analyzer.DatasetAnalyzer",
+        "app.generators.registry.get_available_generators",
+        "app.research.sources.source_status",
+        "app.research.sources.worker_python",
+        "app.timeseries.data.profile_sequences"
+      ],
+      "functions": [
+        {
+          "name": "worker_hardware",
+          "kind": "function",
+          "line": 13,
+          "arguments": [
+            "interpreter"
+          ],
+          "calls": [
+            "json.loads",
+            "lru_cache",
+            "str",
+            "subprocess.run"
+          ]
+        },
+        {
+          "name": "worker_dependencies",
+          "kind": "function",
+          "line": 23,
+          "arguments": [
+            "interpreter"
+          ],
+          "calls": [
+            "json.loads",
+            "lru_cache",
+            "str",
+            "subprocess.run"
+          ]
+        },
+        {
+          "name": "model_inventory",
+          "kind": "function",
+          "line": 33,
+          "arguments": [
+            "allow_experimental",
+            "probe_hardware"
+          ],
+          "calls": [
+            "dependencies.get",
+            "get_available_generators",
+            "source_status",
+            "status.update",
+            "tables.items",
+            "worker_dependencies",
+            "worker_hardware",
+            "worker_python"
+          ]
+        },
+        {
+          "name": "plan_experiment",
+          "kind": "function",
+          "line": 61,
+          "arguments": [
+            "frame",
+            "config"
+          ],
+          "calls": [
+            "DatasetAnalyzer",
+            "analysis.model_dump",
+            "analyze",
+            "len",
+            "model_inventory",
+            "profile_sequences"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.selection",
+      "path": "app/research/selection.py",
+      "imports": [
+        "time"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "select_experiment_candidate",
+          "kind": "function",
+          "line": 5,
+          "arguments": [
+            "config",
+            "names",
+            "evaluate"
+          ],
+          "calls": [
+            "ValueError",
+            "any",
+            "bool",
+            "completed.append",
+            "dict.fromkeys",
+            "evaluate",
+            "max",
+            "str",
+            "time.perf_counter",
+            "trials.append",
+            "type"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.sources",
+      "path": "app/research/sources.py",
+      "imports": [
+        "app.utils.exceptions.GeneratorError",
+        "json",
+        "os",
+        "pathlib.Path",
+        "subprocess",
+        "sys"
+      ],
+      "internal_imports": [
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [
+        {
+          "name": "worker_python",
+          "kind": "function",
+          "line": 14,
+          "arguments": [],
+          "calls": [
+            "os.environ.get",
+            "overlay.exists",
+            "str"
+          ]
+        },
+        {
+          "name": "source_path",
+          "kind": "function",
+          "line": 19,
+          "arguments": [
+            "name",
+            "verify"
+          ],
+          "calls": [
+            "GeneratorError",
+            "Path",
+            "exists",
+            "modified.strip",
+            "os.environ.get",
+            "resolve",
+            "str",
+            "strip",
+            "subprocess.check_output"
+          ]
+        },
+        {
+          "name": "source_status",
+          "kind": "function",
+          "line": 34,
+          "arguments": [
+            "name"
+          ],
+          "calls": [
+            "source_path",
+            "str"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.research.store",
+      "path": "app/research/store.py",
+      "imports": [
+        "datetime.datetime",
+        "datetime.timezone",
+        "json",
+        "pathlib.Path",
+        "sqlite3",
+        "uuid.uuid4"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "now",
+          "kind": "function",
+          "line": 9,
+          "arguments": [],
+          "calls": [
+            "datetime.now",
+            "isoformat"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "ExperimentStore",
+          "line": 13,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 14,
+              "arguments": [
+                "self",
+                "root"
+              ],
+              "calls": [
+                "Path",
+                "connection.execute",
+                "resolve",
+                "self.connect",
+                "self.root.mkdir"
+              ]
+            },
+            {
+              "name": "connect",
+              "kind": "function",
+              "line": 23,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "connection.execute",
+                "sqlite3.connect"
+              ]
+            },
+            {
+              "name": "create",
+              "kind": "function",
+              "line": 28,
+              "arguments": [
+                "self",
+                "config",
+                "dataset_hash",
+                "dataset_identifier"
+              ],
+              "calls": [
+                "connection.execute",
+                "directory.mkdir",
+                "json.dumps",
+                "now",
+                "self.connect",
+                "uuid4",
+                "write_text"
+              ]
+            },
+            {
+              "name": "get",
+              "kind": "function",
+              "line": 41,
+              "arguments": [
+                "self",
+                "identifier"
+              ],
+              "calls": [
+                "KeyError",
+                "connection.execute",
+                "fetchone",
+                "json.loads",
+                "self.connect"
+              ]
+            },
+            {
+              "name": "update",
+              "kind": "function",
+              "line": 48,
+              "arguments": [
+                "self",
+                "identifier",
+                "**changes"
+              ],
+              "calls": [
+                "KeyError",
+                "connection.execute",
+                "fetchone",
+                "json.dumps",
+                "json.loads",
+                "now",
+                "payload.update",
+                "self.connect"
+              ]
+            },
+            {
+              "name": "event",
+              "kind": "function",
+              "line": 61,
+              "arguments": [
+                "self",
+                "identifier",
+                "stage",
+                "message"
+              ],
+              "calls": [
+                "now",
+                "self.get",
+                "self.update"
+              ]
+            },
+            {
+              "name": "list",
+              "kind": "function",
+              "line": 65,
+              "arguments": [
+                "self",
+                "limit"
+              ],
+              "calls": [
+                "connection.execute",
+                "fetchall",
+                "json.loads",
+                "max",
+                "min",
+                "self.connect"
+              ]
+            },
+            {
+              "name": "recover_interrupted",
+              "kind": "function",
+              "line": 71,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "connection.execute",
+                "fetchall",
+                "self.connect",
+                "self.update"
+              ]
+            },
+            {
+              "name": "directory",
+              "kind": "function",
+              "line": 78,
+              "arguments": [
+                "self",
+                "identifier"
+              ],
+              "calls": [
+                "self.get"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.schemas.__init__",
+      "path": "app/schemas/__init__.py",
+      "imports": [
+        "app.schemas.schemas.AgentLog",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.CrossValidatedModelResult",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.ModelMetrics",
+        "app.schemas.schemas.OptimizationDecision",
+        "app.schemas.schemas.PipelineResult",
+        "app.schemas.schemas.ValidationResult"
+      ],
+      "internal_imports": [
+        "app.schemas.schemas.AgentLog",
+        "app.schemas.schemas.BenchmarkResult",
+        "app.schemas.schemas.CrossValidatedModelResult",
+        "app.schemas.schemas.DatasetAnalysis",
+        "app.schemas.schemas.GenerationPlan",
+        "app.schemas.schemas.ModelMetrics",
+        "app.schemas.schemas.OptimizationDecision",
+        "app.schemas.schemas.PipelineResult",
+        "app.schemas.schemas.ValidationResult"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.schemas.schemas",
+      "path": "app/schemas/schemas.py",
+      "imports": [
+        "__future__.annotations",
+        "app.generators.base.GeneratorConfig",
+        "datetime.datetime",
+        "pydantic.BaseModel",
+        "pydantic.Field",
+        "pydantic.field_validator",
+        "typing.Any",
+        "typing.Literal"
+      ],
+      "internal_imports": [
+        "app.generators.base.GeneratorConfig"
+      ],
+      "functions": [
+        {
+          "name": "utc_now",
+          "kind": "function",
+          "line": 259,
+          "arguments": [],
+          "calls": [
+            "datetime.utcnow",
+            "isoformat",
+            "replace"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "DatasetAnalysis",
+          "line": 12,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "GenerationPlan",
+          "line": 37,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": [
+            {
+              "name": "registered_generator",
+              "kind": "function",
+              "line": 62,
+              "arguments": [
+                "cls",
+                "value"
+              ],
+              "calls": [
+                "ValueError",
+                "field_validator"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ValidationResult",
+          "line": 69,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "UnsupervisedUtilityResult",
+          "line": 82,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "ModelMetrics",
+          "line": 96,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "BenchmarkResult",
+          "line": 113,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "CrossValidatedModelResult",
+          "line": 127,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "ModelSuiteResult",
+          "line": 135,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "CandidateEvaluation",
+          "line": 143,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "OptimizationDecision",
+          "line": 166,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "AgentLog",
+          "line": 178,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "IterationRecord",
+          "line": 184,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "ProvenanceFingerprint",
+          "line": 199,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "FairnessResult",
+          "line": 209,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "PipelineResult",
+          "line": 216,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        },
+        {
+          "name": "PipelineConfigModel",
+          "line": 242,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.text.__init__",
+      "path": "app/text/__init__.py",
+      "imports": [
+        "consistency.evaluate_consistency",
+        "generator.TemplateTextGenerator",
+        "generator.TextGenerationConfig"
+      ],
+      "internal_imports": [],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.text.consistency",
+      "path": "app/text/consistency.py",
+      "imports": [
+        "re",
+        "typing.Any",
+        "typing.Mapping",
+        "typing.Sequence"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "evaluate_consistency",
+          "kind": "function",
+          "line": 6,
+          "arguments": [
+            "records",
+            "texts",
+            "rules"
+          ],
+          "calls": [
+            "ValueError",
+            "expected.lower",
+            "len",
+            "mapping.get",
+            "matched.append",
+            "re.escape",
+            "re.search",
+            "results.append",
+            "rules.items",
+            "str",
+            "sum",
+            "text.lower",
+            "violations.append",
+            "zip"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.text.generator",
+      "path": "app/text/generator.py",
+      "imports": [
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "typing.Any",
+        "typing.Mapping"
+      ],
+      "internal_imports": [],
+      "functions": [],
+      "classes": [
+        {
+          "name": "TextGenerationConfig",
+          "line": 7,
+          "bases": [],
+          "methods": []
+        },
+        {
+          "name": "TemplateTextGenerator",
+          "line": 13,
+          "bases": [],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 18,
+              "arguments": [
+                "self",
+                "config"
+              ],
+              "calls": [
+                "TextGenerationConfig"
+              ]
+            },
+            {
+              "name": "generate",
+              "kind": "function",
+              "line": 21,
+              "arguments": [
+                "self",
+                "records"
+              ],
+              "calls": [
+                "enumerate",
+                "join",
+                "keys",
+                "record.get",
+                "rendered.append",
+                "self.config.template.format",
+                "tuple"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.timeseries.__init__",
+      "path": "app/timeseries/__init__.py",
+      "imports": [],
+      "internal_imports": [],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.timeseries.data",
+      "path": "app/timeseries/data.py",
+      "imports": [
+        "dataclasses.dataclass",
+        "numpy",
+        "pandas",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.Field",
+        "pydantic.model_validator",
+        "typing.Literal"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "profile_sequences",
+          "kind": "function",
+          "line": 41,
+          "arguments": [
+            "frame",
+            "schema"
+          ],
+          "calls": [
+            "ValueError",
+            "any",
+            "data.groupby",
+            "entities.append",
+            "frame.copy",
+            "int",
+            "irregular.sum",
+            "isna",
+            "len",
+            "max",
+            "np.abs",
+            "np.diff",
+            "np.median",
+            "pd.to_datetime",
+            "set",
+            "sort_values",
+            "sorted",
+            "stamps.astype",
+            "str",
+            "sum"
+          ]
+        },
+        {
+          "name": "prepare_sequences",
+          "kind": "function",
+          "line": 66,
+          "arguments": [
+            "frame",
+            "schema"
+          ],
+          "calls": [
+            "PreparedSequences",
+            "ValueError",
+            "all",
+            "any",
+            "append",
+            "apply",
+            "astype",
+            "batches.append",
+            "chunk.__source_row__.tolist",
+            "cleaned.items",
+            "copy",
+            "data.groupby",
+            "ffill",
+            "frame.reset_index",
+            "group.sort_values",
+            "int",
+            "intervals.pop",
+            "len",
+            "low.tolist",
+            "medians.tolist",
+            "np.arange",
+            "np.asarray",
+            "np.concatenate",
+            "np.isinf",
+            "np.isnan",
+            "np.nanmedian",
+            "np.where",
+            "partitions.items",
+            "pd.DataFrame",
+            "pd.to_datetime",
+            "profile_sequences",
+            "range",
+            "records.append",
+            "schema.model_dump",
+            "span.tolist",
+            "str",
+            "to_numpy",
+            "tolist",
+            "training.max",
+            "training.min",
+            "zip"
+          ]
+        },
+        {
+          "name": "inverse_sequences",
+          "kind": "function",
+          "line": 127,
+          "arguments": [
+            "values",
+            "metadata"
+          ],
+          "calls": [
+            "np.array"
+          ]
+        },
+        {
+          "name": "sequences_to_frame",
+          "kind": "function",
+          "line": 131,
+          "arguments": [
+            "values",
+            "metadata"
+          ],
+          "calls": [
+            "TimeSeriesSchema",
+            "enumerate",
+            "frame.insert",
+            "inverse_sequences",
+            "pd.DataFrame",
+            "pd.Timedelta",
+            "pd.concat",
+            "pd.date_range",
+            "rows.append"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "TimeSeriesSchema",
+          "line": 9,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": [
+            {
+              "name": "validate_roles",
+              "kind": "function",
+              "line": 24,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "ValueError",
+                "len",
+                "model_validator",
+                "pd.Timestamp",
+                "set"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "PreparedSequences",
+          "line": 35,
+          "bases": [],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.timeseries.generators",
+      "path": "app/timeseries/generators.py",
+      "imports": [
+        "app.config.get_settings",
+        "app.generators.runtime.MODEL_LOCK",
+        "app.research.sources.ROOT",
+        "app.research.sources.SOURCES",
+        "app.research.sources.source_path",
+        "app.research.sources.worker_python",
+        "app.utils.exceptions.GeneratorError",
+        "json",
+        "numpy",
+        "os",
+        "pathlib.Path",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.Field",
+        "pydantic.model_validator",
+        "subprocess",
+        "typing.Literal",
+        "uuid.uuid4"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.generators.runtime.MODEL_LOCK",
+        "app.research.sources.ROOT",
+        "app.research.sources.SOURCES",
+        "app.research.sources.source_path",
+        "app.research.sources.worker_python",
+        "app.utils.exceptions.GeneratorError"
+      ],
+      "functions": [],
+      "classes": [
+        {
+          "name": "SequenceConfig",
+          "line": 18,
+          "bases": [
+            "BaseModel"
+          ],
+          "methods": [
+            {
+              "name": "consistent",
+              "kind": "function",
+              "line": 33,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "ValueError",
+                "model_validator"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "SequenceGenerator",
+          "line": 41,
+          "bases": [],
+          "methods": [
+            {
+              "name": "_worker",
+              "kind": "function",
+              "line": 44,
+              "arguments": [
+                "self",
+                "operation",
+                "count"
+              ],
+              "calls": [
+                "GeneratorError",
+                "int",
+                "os.environ.get",
+                "str",
+                "subprocess.run",
+                "worker_python"
+              ]
+            },
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 53,
+              "arguments": [
+                "self",
+                "windows",
+                "config",
+                "metadata"
+              ],
+              "calls": [
+                "GeneratorError",
+                "Path",
+                "SequenceConfig",
+                "all",
+                "cfg.model_dump",
+                "get_settings",
+                "json.dumps",
+                "list",
+                "np.isfinite",
+                "np.save",
+                "resolve",
+                "self._worker",
+                "self.directory.mkdir",
+                "source_path",
+                "str",
+                "uuid4",
+                "windows.astype",
+                "write_text"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 69,
+              "arguments": [
+                "self",
+                "num_sequences"
+              ],
+              "calls": [
+                "GeneratorError",
+                "all",
+                "getattr",
+                "isinstance",
+                "json.loads",
+                "np.isfinite",
+                "np.load",
+                "read_text",
+                "self._worker"
+              ]
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 79,
+              "arguments": [
+                "self"
+              ],
+              "calls": [
+                "json.loads",
+                "read_text",
+                "str"
+              ]
+            },
+            {
+              "name": "load",
+              "kind": "function",
+              "line": 83,
+              "arguments": [
+                "cls",
+                "directory"
+              ],
+              "calls": [
+                "GeneratorError",
+                "Path",
+                "cls",
+                "exists",
+                "json.loads",
+                "read_text",
+                "resolve",
+                "source_path"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "TimeGANGenerator",
+          "line": 97,
+          "bases": [
+            "SequenceGenerator"
+          ],
+          "methods": []
+        },
+        {
+          "name": "WindowBootstrapGenerator",
+          "line": 101,
+          "bases": [],
+          "methods": [
+            {
+              "name": "fit",
+              "kind": "function",
+              "line": 105,
+              "arguments": [
+                "self",
+                "windows",
+                "config",
+                "metadata"
+              ],
+              "calls": [
+                "GeneratorError",
+                "SequenceConfig",
+                "all",
+                "copy",
+                "np.asarray",
+                "np.isfinite",
+                "time.perf_counter"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 119,
+              "arguments": [
+                "self",
+                "count"
+              ],
+              "calls": [
+                "copy",
+                "integers",
+                "len",
+                "np.random.default_rng"
+              ]
+            },
+            {
+              "name": "get_metadata",
+              "kind": "function",
+              "line": 122,
+              "arguments": [
+                "self"
+              ],
+              "calls": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.timeseries.timegan",
+      "path": "app/timeseries/timegan.py",
+      "imports": [
+        "torch",
+        "torch.nn",
+        "torch.nn.functional"
+      ],
+      "internal_imports": [],
+      "functions": [],
+      "classes": [
+        {
+          "name": "RecurrentBlock",
+          "line": 11,
+          "bases": [
+            "nn.Module"
+          ],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 12,
+              "arguments": [
+                "self",
+                "inputs",
+                "hidden",
+                "outputs",
+                "layers",
+                "sigmoid"
+              ],
+              "calls": [
+                "__init__",
+                "nn.GRU",
+                "nn.Linear",
+                "super"
+              ]
+            },
+            {
+              "name": "forward",
+              "kind": "function",
+              "line": 18,
+              "arguments": [
+                "self",
+                "values"
+              ],
+              "calls": [
+                "self.gru",
+                "self.projection",
+                "values.sigmoid"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "TimeGAN",
+          "line": 23,
+          "bases": [
+            "nn.Module"
+          ],
+          "methods": [
+            {
+              "name": "__init__",
+              "kind": "function",
+              "line": 24,
+              "arguments": [
+                "self",
+                "features",
+                "hidden",
+                "layers"
+              ],
+              "calls": [
+                "RecurrentBlock",
+                "__init__",
+                "max",
+                "nn.ModuleDict",
+                "super"
+              ]
+            },
+            {
+              "name": "sample",
+              "kind": "function",
+              "line": 35,
+              "arguments": [
+                "self",
+                "count",
+                "length",
+                "device"
+              ],
+              "calls": [
+                "torch.rand"
+              ]
+            },
+            {
+              "name": "train_phases",
+              "kind": "function",
+              "line": 40,
+              "arguments": [
+                "self",
+                "loader",
+                "epochs",
+                "learning_rate",
+                "device"
+              ],
+              "calls": [
+                "F.binary_cross_entropy_with_logits",
+                "F.mse_loss",
+                "ValueError",
+                "abs",
+                "adversarial",
+                "batch.to",
+                "detach",
+                "discriminator_loss.detach",
+                "embed_loss.detach",
+                "float",
+                "generator_loss.detach",
+                "history.update",
+                "loss.backward",
+                "mean",
+                "module.requires_grad_",
+                "net.items",
+                "optimizer.step",
+                "optimizer.zero_grad",
+                "parameters",
+                "range",
+                "real.mean",
+                "real.var",
+                "reconstruction.detach",
+                "self.requires_grad_",
+                "sqrt",
+                "step",
+                "supervised",
+                "supervision.detach",
+                "synthetic.mean",
+                "synthetic.var",
+                "torch.isfinite",
+                "torch.no_grad",
+                "torch.ones_like",
+                "torch.optim.Adam",
+                "torch.rand_like",
+                "torch.sqrt",
+                "torch.zeros_like",
+                "trainable"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "app.utils.__init__",
+      "path": "app/utils/__init__.py",
+      "imports": [
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging"
+      ],
+      "internal_imports": [
+        "app.utils.logging_config.get_logger",
+        "app.utils.logging_config.setup_logging"
+      ],
+      "functions": [],
+      "classes": []
+    },
+    {
+      "module": "app.utils.data_utils",
+      "path": "app/utils/data_utils.py",
+      "imports": [
+        "__future__.annotations",
+        "app.config.get_settings",
+        "app.utils.exceptions.InvalidDatasetError",
+        "io.BytesIO",
+        "numpy",
+        "pandas",
+        "pathlib.Path",
+        "re",
+        "typing.Any"
+      ],
+      "internal_imports": [
+        "app.config.get_settings",
+        "app.utils.exceptions.InvalidDatasetError"
+      ],
+      "functions": [
+        {
+          "name": "load_csv",
+          "kind": "function",
+          "line": 37,
+          "arguments": [
+            "path"
+          ],
+          "calls": [
+            "InvalidDatasetError",
+            "pd.read_csv",
+            "validate_dataframe"
+          ]
+        },
+        {
+          "name": "load_csv_bytes",
+          "kind": "function",
+          "line": 45,
+          "arguments": [
+            "content",
+            "filename"
+          ],
+          "calls": [
+            "BytesIO",
+            "InvalidDatasetError",
+            "endswith",
+            "filename.lower",
+            "get_settings",
+            "len",
+            "pd.read_csv",
+            "validate_dataframe"
+          ]
+        },
+        {
+          "name": "validate_dataframe",
+          "kind": "function",
+          "line": 61,
+          "arguments": [
+            "df",
+            "min_rows"
+          ],
+          "calls": [
+            "InvalidDatasetError",
+            "any",
+            "df.columns.duplicated",
+            "df.copy",
+            "get_settings",
+            "len",
+            "str",
+            "strip"
+          ]
+        },
+        {
+          "name": "infer_column_types",
+          "kind": "function",
+          "line": 78,
+          "arguments": [
+            "df"
+          ],
+          "calls": [
+            "categorical.append",
+            "col.lower",
+            "int",
+            "len",
+            "list",
+            "max",
+            "numerical.append",
+            "pd.api.types.is_float_dtype",
+            "pd.api.types.is_numeric_dtype",
+            "series.nunique"
+          ]
+        },
+        {
+          "name": "infer_semantic_types",
+          "kind": "function",
+          "line": 104,
+          "arguments": [
+            "df",
+            "target_column"
+          ],
+          "calls": [
+            "_infer_semantic_type",
+            "float",
+            "int",
+            "len",
+            "lower",
+            "max",
+            "mean",
+            "non_null.nunique",
+            "round",
+            "series.dropna",
+            "series.isna",
+            "str",
+            "strip"
+          ]
+        },
+        {
+          "name": "_infer_semantic_type",
+          "kind": "function",
+          "line": 134,
+          "arguments": [
+            "series",
+            "name",
+            "unique_ratio",
+            "unique_count",
+            "is_target"
+          ],
+          "calls": [
+            "_is_boolean",
+            "_is_datetime",
+            "_is_identifier",
+            "any",
+            "astype",
+            "dropna",
+            "float",
+            "mean",
+            "np.allclose",
+            "np.round",
+            "pd.api.types.is_numeric_dtype",
+            "pd.to_numeric",
+            "series.dropna",
+            "text.str.len"
+          ]
+        },
+        {
+          "name": "_is_boolean",
+          "kind": "function",
+          "line": 169,
+          "arguments": [
+            "series"
+          ],
+          "calls": [
+            "bool",
+            "len",
+            "lower",
+            "series.dropna",
+            "str",
+            "strip",
+            "unique"
+          ]
+        },
+        {
+          "name": "_is_datetime",
+          "kind": "function",
+          "line": 174,
+          "arguments": [
+            "series",
+            "name"
+          ],
+          "calls": [
+            "any",
+            "astype",
+            "float",
+            "len",
+            "mean",
+            "parsed.notna",
+            "pd.api.types.is_numeric_dtype",
+            "pd.to_datetime",
+            "series.dropna",
+            "str.strip",
+            "text.str.contains"
+          ]
+        },
+        {
+          "name": "_is_identifier",
+          "kind": "function",
+          "line": 188,
+          "arguments": [
+            "series",
+            "name",
+            "unique_ratio"
+          ],
+          "calls": [
+            "IDENTIFIER_NAME_PATTERN.search",
+            "astype",
+            "bool",
+            "float",
+            "len",
+            "np.all",
+            "np.diff",
+            "pd.api.types.is_integer_dtype",
+            "series.dropna",
+            "to_numpy",
+            "uuid_like.mean",
+            "values.str.fullmatch"
+          ]
+        },
+        {
+          "name": "save_csv",
+          "kind": "function",
+          "line": 203,
+          "arguments": [
+            "df",
+            "path"
+          ],
+          "calls": [
+            "Path",
+            "df.to_csv",
+            "path.parent.mkdir"
+          ]
+        },
+        {
+          "name": "create_sample_churn_dataset",
+          "kind": "function",
+          "line": 210,
+          "arguments": [
+            "path",
+            "n_rows",
+            "seed"
+          ],
+          "calls": [
+            "clip",
+            "int",
+            "max",
+            "np.argsort",
+            "np.random.default_rng",
+            "np.zeros",
+            "pd.DataFrame",
+            "rng.choice",
+            "rng.integers",
+            "rng.normal",
+            "round",
+            "save_csv"
+          ]
+        },
+        {
+          "name": "create_unlabeled_customer_dataset",
+          "kind": "function",
+          "line": 263,
+          "arguments": [
+            "path",
+            "n_rows",
+            "seed"
+          ],
+          "calls": [
+            "clip",
+            "np.random.default_rng",
+            "pd.DataFrame",
+            "rng.choice",
+            "rng.integers",
+            "rng.normal",
+            "rng.poisson",
+            "round",
+            "save_csv"
+          ]
+        },
+        {
+          "name": "create_sample_timeseries_dataset",
+          "kind": "function",
+          "line": 295,
+          "arguments": [
+            "path",
+            "observations_per_entity",
+            "seed"
+          ],
+          "calls": [
+            "ValueError",
+            "enumerate",
+            "frames.append",
+            "np.arange",
+            "np.cos",
+            "np.random.default_rng",
+            "np.sin",
+            "pd.DataFrame",
+            "pd.concat",
+            "pd.date_range",
+            "pressure.round",
+            "rng.normal",
+            "save_csv",
+            "temperature.round",
+            "vibration.round"
+          ]
+        }
+      ],
+      "classes": []
+    },
+    {
+      "module": "app.utils.exceptions",
+      "path": "app/utils/exceptions.py",
+      "imports": [],
+      "internal_imports": [],
+      "functions": [],
+      "classes": [
+        {
+          "name": "SyntheticAIError",
+          "line": 4,
+          "bases": [
+            "Exception"
+          ],
+          "methods": []
+        },
+        {
+          "name": "InvalidDatasetError",
+          "line": 8,
+          "bases": [
+            "SyntheticAIError"
+          ],
+          "methods": []
+        },
+        {
+          "name": "GeneratorError",
+          "line": 12,
+          "bases": [
+            "SyntheticAIError"
+          ],
+          "methods": []
+        },
+        {
+          "name": "BenchmarkError",
+          "line": 16,
+          "bases": [
+            "SyntheticAIError"
+          ],
+          "methods": []
+        },
+        {
+          "name": "PipelineError",
+          "line": 20,
+          "bases": [
+            "SyntheticAIError"
+          ],
+          "methods": []
+        }
+      ]
+    },
+    {
+      "module": "app.utils.logging_config",
+      "path": "app/utils/logging_config.py",
+      "imports": [
+        "__future__.annotations",
+        "logging",
+        "sys"
+      ],
+      "internal_imports": [],
+      "functions": [
+        {
+          "name": "setup_logging",
+          "kind": "function",
+          "line": 12,
+          "arguments": [
+            "level"
+          ],
+          "calls": [
+            "getattr",
+            "handler.setFormatter",
+            "isinstance",
+            "level.upper",
+            "logging.Formatter",
+            "logging.StreamHandler",
+            "logging.getLogger",
+            "root.addHandler",
+            "root.setLevel"
+          ]
+        },
+        {
+          "name": "get_logger",
+          "kind": "function",
+          "line": 31,
+          "arguments": [
+            "name"
+          ],
+          "calls": [
+            "logging.getLogger",
+            "setup_logging"
+          ]
+        }
+      ],
+      "classes": []
+    }
+  ]
+}

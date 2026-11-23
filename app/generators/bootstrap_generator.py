@@ -5,7 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from app.generators.base import BaseSyntheticGenerator
+from app.generators.base import BaseSyntheticGenerator, GeneratorConfig, SamplingConfig
+from app.generators.runtime import resolve_device
 from app.utils.data_utils import infer_column_types
 from app.utils.exceptions import GeneratorError
 from app.utils.logging_config import get_logger
@@ -16,7 +17,35 @@ logger = get_logger("Generator")
 class BootstrapGenerator(BaseSyntheticGenerator):
     name = "bootstrap"
 
-    def generate(
+    def fit(self, data: pd.DataFrame, config: GeneratorConfig | None = None):
+        self._data = None
+        self.validate_input(data)
+        cfg = config or GeneratorConfig()
+        if cfg.advanced is not None:
+            raise GeneratorError("Bootstrap does not accept advanced diffusion configuration.")
+        resolve_device(cfg.device, supports_gpu=False)
+        if cfg.epochs is not None or cfg.batch_size is not None:
+            raise GeneratorError("Bootstrap does not support epochs or batch_size.")
+        self._config = cfg.model_copy(update={"device": "cpu"})
+        self._rng = np.random.default_rng(cfg.random_state)
+        self._data = data.copy()
+        return self
+
+    def sample(self, num_samples: int, config: SamplingConfig | None = None) -> pd.DataFrame:
+        cfg = config or SamplingConfig()
+        self._validate_sampling(num_samples, cfg)
+        if getattr(self, "_data", None) is None:
+            raise GeneratorError("Bootstrap must be fitted before sampling.")
+        return self._sample_from_frame(self._data, num_samples, self._rng,
+                                       condition_column=cfg.condition_column, condition_value=cfg.condition_value)
+
+    def get_metadata(self) -> dict:
+        fitted = getattr(self, "_data", None) is not None
+        return {"generator": self.name, "modality": "tabular", "fitted": fitted,
+                "config": self._config.model_dump() if fitted else None,
+                "columns": list(self._data.columns) if fitted else []}
+
+    def _sample_from_frame(
         self,
         df: pd.DataFrame,
         num_samples: int,
@@ -132,10 +161,6 @@ class BootstrapGenerator(BaseSyntheticGenerator):
 
         out = out[df.columns]
 
-        logger.warning(
-            "Bootstrap fallback generated %d rows. "
-            "This should only be used when the requested SDV generator fails.",
-            len(out),
-        )
+        logger.info("Bootstrap baseline generated %d rows", len(out))
 
         return out.reset_index(drop=True)

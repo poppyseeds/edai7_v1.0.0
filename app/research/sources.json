@@ -1,0 +1,14 @@
+{
+  "tabsyn": {
+    "url": "https://github.com/amazon-science/tabsyn.git",
+    "commit": "cb5ac0f74ec36ee88e7a974a393dfbef50d42da7",
+    "license": "Apache-2.0",
+    "env": "TABSYN_SOURCE"
+  },
+  "diffusion_ts": {
+    "url": "https://github.com/Y-debug-sys/Diffusion-TS.git",
+    "commit": "566307e6cf2d8095e58de4c6e3a6ae965b69b5b5",
+    "license": "MIT",
+    "env": "DIFFUSION_TS_SOURCE"
+  }
+}

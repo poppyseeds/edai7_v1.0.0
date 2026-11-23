@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.schemas.schemas import PipelineResult
+from app.config import get_settings
 
 
 def build_final_report_payload(result: PipelineResult) -> dict[str, Any]:
@@ -35,6 +36,7 @@ def build_final_report_payload(result: PipelineResult) -> dict[str, Any]:
         "selected_candidate": candidates[result.best_iteration - 1] if selected and result.best_iteration else None,
         "baseline": result.baseline.model_dump() if result.baseline else None,
         "final_evaluation": result.final_evaluation,
+        "artifact_eligible": result.artifact_eligible,
     }
 
 
@@ -61,7 +63,9 @@ def deterministic_final_report(payload: dict[str, Any]) -> str:
         f"Rejected or limited candidates: {rejection_text}\n\n"
         "Privacy and Reliability\n"
         "Privacy and validity are empirical checks, not formal anonymity or differential-privacy guarantees. "
-        "The untouched final test set remains separate from generator fitting and selection.\n\n"
+        "Labeled candidate ranking uses validation rows; final-test metrics are computed after selection. "
+        "Unlabeled results measure training-distribution similarity, not held-out predictive utility. "
+        f"Artifact passed quality gates: {payload.get('artifact_eligible', False)}.\n\n"
         "Recommended Next Actions\n"
         "Review feature-level validation details, inspect any rejected candidate reasons, and obtain domain review before operational use."
     )
@@ -72,12 +76,17 @@ def _family(generator: str) -> str:
 
 
 def _failure_reasons(item) -> list[str]:
+    settings = get_settings()
     privacy = item.validation.details.get("privacy", {})
     reasons = []
-    if item.validation.constraint_score is not None and item.validation.constraint_score < 0.95:
+    if not item.validation.passed:
+        reasons.append("overall_validation_below_threshold")
+    if item.validation.constraint_score is None or item.validation.constraint_score < settings.min_validity_score:
         reasons.append("validity_score_below_threshold")
-    if item.validation.privacy_score < 0.70:
+    if item.validation.privacy_score < settings.min_privacy_score:
         reasons.append("privacy_score_below_threshold")
-    if privacy.get("exact_duplicate_rate", 0) > 0.05:
+    if privacy.get("exact_duplicate_rate", 0) > settings.max_exact_match_rate:
         reasons.append("exact_match_rate_above_threshold")
+    if item.validation.distribution_score < settings.min_distribution_score:
+        reasons.append("distribution_score_below_threshold")
     return reasons

@@ -290,3 +290,45 @@ def create_unlabeled_customer_dataset(
         }
     )
     return save_csv(df, path)
+
+
+def create_sample_timeseries_dataset(
+    path: str | Path,
+    observations_per_entity: int = 120,
+    seed: int = 314,
+) -> Path:
+    """Create a regular multivariate sensor series for temporal demos/tests.
+
+    Two machines are sampled hourly. ``machine_type`` is context metadata;
+    temperature, vibration and pressure are the numerical generated features.
+    """
+    if observations_per_entity < 40:
+        raise ValueError("Time-series samples require at least 40 observations per entity.")
+    rng = np.random.default_rng(seed)
+    frames = []
+    for entity_index, (entity, machine_type) in enumerate(
+        (("machine_a", "compressor"), ("machine_b", "pump"))
+    ):
+        step = np.arange(observations_per_entity, dtype=float)
+        phase = entity_index * 0.8
+        temperature = (
+            55 + entity_index * 4 + 5 * np.sin(2 * np.pi * step / 24 + phase)
+            + 0.025 * step + rng.normal(0, 0.35, observations_per_entity)
+        )
+        vibration = (
+            1.4 + entity_index * 0.25 + 0.35 * np.sin(2 * np.pi * step / 12 + phase)
+            + 0.002 * step + rng.normal(0, 0.035, observations_per_entity)
+        )
+        pressure = (
+            101 + entity_index * 3 + 2.5 * np.cos(2 * np.pi * step / 24 + phase)
+            + 0.15 * temperature + rng.normal(0, 0.25, observations_per_entity)
+        )
+        frames.append(pd.DataFrame({
+            "timestamp": pd.date_range("2026-01-01", periods=observations_per_entity, freq="h", tz="UTC"),
+            "machine_id": entity,
+            "machine_type": machine_type,
+            "temperature_c": temperature.round(3),
+            "vibration_mm_s": vibration.round(4),
+            "pressure_kpa": pressure.round(3),
+        }))
+    return save_csv(pd.concat(frames, ignore_index=True), path)

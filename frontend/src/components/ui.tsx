@@ -1,13 +1,13 @@
 import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
 
 export function Card({ children, className = "" }: PropsWithChildren<{ className?: string }>) {
-  return <section className={`rounded-lg border border-line bg-panel/90 shadow-panel ${className}`}>{children}</section>;
+  return <section className={`rounded-xl border border-line bg-panel/90 shadow-panel ${className}`}>{children}</section>;
 }
 export function Button({ children, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-45 ${className}`} {...props}>{children}</button>;
 }
 export function Metric({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
-  return <Card className="p-4"><p className="text-xs uppercase tracking-[0.12em] text-muted">{label}</p><p className="mt-2 text-2xl font-semibold text-ink">{value}</p>{detail && <p className="mt-1 text-xs text-muted">{detail}</p>}</Card>;
+  return <Card className="p-4"><p className="text-xs font-medium uppercase tracking-[0.12em] text-muted">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink">{value}</p>{detail && <p className="mt-1 text-sm leading-5 text-muted">{detail}</p>}</Card>;
 }
 export function EmptyState({ title, detail }: { title: string; detail: string }) {
   return <Card className="grid min-h-64 place-items-center p-8 text-center"><div><h2 className="text-lg font-semibold text-ink">{title}</h2><p className="mt-2 max-w-md text-sm text-muted">{detail}</p></div></Card>;

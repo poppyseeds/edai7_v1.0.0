@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.generators.base import GeneratorConfig
 
 
 class DatasetAnalysis(BaseModel):
@@ -34,8 +35,8 @@ class DatasetAnalysis(BaseModel):
 
 
 class GenerationPlan(BaseModel):
-    generator: Literal["ctgan", "tvae", "gaussian_copula", "bootstrap"]
-    num_samples: int
+    generator: str
+    num_samples: int = Field(ge=0)
     reason: str
     generation_needed: bool = True
     generation_mode: str = "dataset_expansion"
@@ -50,10 +51,19 @@ class GenerationPlan(BaseModel):
     max_allowed_samples: int | None = None
     sample_count_reason: str | None = None
     sample_count_details: dict[str, Any] = Field(default_factory=dict)
-    epochs: int | None = None
-    random_state: int = 42
+    epochs: int | None = Field(default=None, ge=1)
+    random_state: int = Field(default=42, ge=0, le=2**32 - 1)
     preserve_columns: list[str] = Field(default_factory=list)
     llm_explanation: str | None = None
+    generator_config: GeneratorConfig = Field(default_factory=GeneratorConfig)
+
+    @field_validator("generator")
+    @classmethod
+    def registered_generator(cls, value: str) -> str:
+        from app.generators.registry import GENERATOR_REGISTRY
+        if value not in GENERATOR_REGISTRY:
+            raise ValueError(f"Unknown generator '{value}'.")
+        return value
 
 
 class ValidationResult(BaseModel):
@@ -111,6 +121,7 @@ class BenchmarkResult(BaseModel):
     min_relative_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
     notes: str = ""
+    evaluation_role: Literal["validation", "final_test", "test"] = "test"
 
 
 class CrossValidatedModelResult(BaseModel):
@@ -182,6 +193,7 @@ class IterationRecord(BaseModel):
     decision: str = "retry"
     synthetic_rows: int
     synthetic_path: str | None = None
+    generator_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProvenanceFingerprint(BaseModel):
@@ -221,18 +233,24 @@ class PipelineResult(BaseModel):
     improved: bool
     final_dataset_path: str | None = None
     best_iteration: int | None = None
+    final_benchmark: BenchmarkResult | None = None
+    planning_analysis: DatasetAnalysis | None = None
+    split_manifest: dict[str, Any] = Field(default_factory=dict)
+    artifact_eligible: bool = False
 
 
 class PipelineConfigModel(BaseModel):
-    max_iterations: int = 5
-    random_state: int = 42
-    synthetic_ratio: float = 0.3
-    ctgan_epochs: int | None = None
-    tvae_epochs: int = 10
+    max_iterations: int = Field(default=5, ge=1, le=50)
+    random_state: int = Field(default=42, ge=0, le=2**32 - 1)
+    synthetic_ratio: float | None = Field(default=None, ge=0)
+    ctgan_epochs: int | None = Field(default=None, ge=1)
+    tvae_epochs: int = Field(default=10, ge=1)
     min_improvement: float = 0.02
     min_absolute_improvement: float = 0.01
-    test_size: float = 0.25
-    enable_llm: bool = True
+    test_size: float = Field(default=0.25, gt=0, lt=1)
+    validation_size: float = Field(default=0.25, gt=0, lt=1)
+    generator_config: GeneratorConfig = Field(default_factory=GeneratorConfig)
+    enable_llm: bool = False
     auto_detect_target: bool = False
     preferred_generator: str | None = None
     sensitive_column: str | None = None
